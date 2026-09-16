@@ -78,7 +78,15 @@
       const text = e.results[e.results.length - 1][0].transcript.trim();
       handleTranscript(text);
     };
-    recognizer.onerror = () => {};
+    recognizer.onerror = (e) => {
+      if (e.error === "not-allowed" || e.error === "service-not-allowed" || e.error === "audio-capture") {
+        stopListening();
+        log.textContent = "Microphone access is blocked here — open this page in your phone or laptop's default browser to use voice control.";
+        toast("Microphone blocked in this preview");
+      }
+      // other errors (e.g. transient "no-speech") are expected during continuous
+      // listening and are left to onend, which restarts only while still listening
+    };
     recognizer.onend = () => { if (listening) recognizer.start(); };
     return recognizer;
   }
