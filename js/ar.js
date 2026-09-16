@@ -3,15 +3,21 @@
   let watchId = null;
   let currentPos = null;
   let currentHeading = null;
-  let simMode = false;
-  let simHeading = 0;
+  let mode = "idle"; // idle | live | demo
+  let demoT = 0; // 0..1 progress across the whole route
   let lastAnnouncedStage = -1;
+  let tickHandle = null;
+  let manualHeading = null;
 
   const video = document.getElementById("arVideo");
   const arrow = document.getElementById("arArrow");
   const status = document.getElementById("arStatus");
+  const distanceEl = document.getElementById("arDistance");
   const banner = document.getElementById("arBanner");
+  const badge = document.getElementById("arModeBadge");
+  const progress = document.getElementById("arProgress");
   const startBtn = document.getElementById("arStart");
+  const demoBtn = document.getElementById("arDemo");
   const stopBtn = document.getElementById("arStop");
   const simSlider = document.getElementById("simBearing");
 
@@ -34,50 +40,97 @@
     return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   }
 
-  function nextIncompleteStage() {
+  function lerp(a, b, t) { return a + (b - a) * t; }
+
+  function currentTarget() {
     return JOURNEY[Math.min(AppState.currentStageIndex, JOURNEY.length - 1)];
   }
 
+  function renderProgress() {
+    progress.innerHTML = "";
+    JOURNEY.forEach((_, idx) => {
+      const dot = document.createElement("span");
+      dot.className = "dot" + (idx < AppState.currentStageIndex ? " done" : idx === AppState.currentStageIndex ? " active" : "");
+      progress.appendChild(dot);
+    });
+  }
+
+  function setBadge(text, cls) {
+    badge.textContent = text;
+    badge.className = "mode-badge" + (cls ? " " + cls : "");
+  }
+
+  function demoPosition() {
+    // Walk a straight line from just before stage 0 through all stages, looping.
+    const startPos = { lat: JOURNEY[0].lat - 0.0004, lng: JOURNEY[0].lng - 0.00035 };
+    const points = [startPos, ...JOURNEY.map(s => ({ lat: s.lat, lng: s.lng }))];
+    const segCount = points.length - 1;
+    const scaled = demoT * segCount;
+    const segIdx = Math.min(Math.floor(scaled), segCount - 1);
+    const segT = scaled - segIdx;
+    const a = points[segIdx], b = points[segIdx + 1];
+    return { lat: lerp(a.lat, b.lat, segT), lng: lerp(a.lng, b.lng, segT) };
+  }
+
   function update() {
-    const target = nextIncompleteStage();
-    const pos = currentPos || { lat: PARK_ANCHOR.lat - 0.0009, lng: PARK_ANCHOR.lng - 0.0007 };
-    const heading = simMode ? simHeading : (currentHeading ?? 0);
+    const target = currentTarget();
+    let pos, heading;
+
+    if (mode === "demo") {
+      pos = demoPosition();
+      heading = bearingTo(pos, { lat: target.lat, lng: target.lng });
+    } else if (mode === "live") {
+      pos = currentPos || { lat: JOURNEY[0].lat - 0.0006, lng: JOURNEY[0].lng - 0.0005 };
+      heading = manualHeading != null ? manualHeading : (currentHeading ?? 0);
+    } else {
+      return;
+    }
 
     const bearing = bearingTo(pos, { lat: target.lat, lng: target.lng });
     const dist = Math.round(distanceMeters(pos, { lat: target.lat, lng: target.lng }));
     const relative = ((bearing - heading) + 360) % 360;
 
     arrow.style.transform = `rotate(${relative}deg)`;
-    banner.textContent = `Stage ${target.stage}/${JOURNEY.length}: ${target.title} — about ${dist}m ahead. ${target.cue}`;
-    status.textContent = simMode
-      ? `Simulated heading ${Math.round(heading)}°`
-      : (currentPos ? `GPS locked · heading ${Math.round(heading)}°` : "Waiting for GPS...");
+    distanceEl.textContent = `${dist} m ahead`;
+    banner.textContent = `Stage ${target.stage}/${JOURNEY.length}: ${target.title} — ${target.cue}`;
+
+    if (mode === "demo") {
+      status.textContent = `Auto-demo · heading ${Math.round(heading)}°`;
+    } else {
+      status.textContent = currentPos ? `GPS locked · heading ${Math.round(heading)}°` : "Waiting for GPS — use manual heading below";
+    }
 
     if (dist < 15 && lastAnnouncedStage !== AppState.currentStageIndex) {
       lastAnnouncedStage = AppState.currentStageIndex;
       speak(target.cue);
       if (AppState.currentStageIndex < JOURNEY.length - 1) {
         AppState.currentStageIndex++;
+        renderStageList();
+        renderProgress();
+      } else if (mode === "demo") {
+        setTimeout(() => { speak("Demo complete. You've arrived at the park."); stopDemo(); }, 300);
       }
-      renderStageList();
     }
+  }
+
+  function loop() {
+    update();
+    if (mode !== "idle") tickHandle = requestAnimationFrame(loop);
   }
 
   function onOrientation(e) {
     let heading = e.webkitCompassHeading;
-    if (heading === undefined) {
-      heading = e.alpha != null ? (360 - e.alpha) % 360 : null;
-    }
+    if (heading === undefined) heading = e.alpha != null ? (360 - e.alpha) % 360 : null;
     if (heading != null) currentHeading = heading;
   }
 
-  async function start() {
+  async function startLive() {
+    stopDemo(true);
     try {
       stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: false });
       video.srcObject = stream;
     } catch (err) {
-      status.textContent = "Camera unavailable (" + err.message + ") — showing simulator only.";
-      simMode = true;
+      status.textContent = "Camera unavailable — try the auto-demo instead.";
     }
 
     if (window.DeviceOrientationEvent && typeof DeviceOrientationEvent.requestPermission === "function") {
@@ -89,45 +142,82 @@
     if (navigator.geolocation) {
       watchId = navigator.geolocation.watchPosition(
         (p) => { currentPos = { lat: p.coords.latitude, lng: p.coords.longitude }; },
-        () => { simMode = true; },
+        () => {},
         { enableHighAccuracy: true, maximumAge: 2000 }
       );
-    } else {
-      simMode = true;
     }
 
+    mode = "live";
+    setBadge("Live", "live");
     startBtn.disabled = true;
     stopBtn.disabled = false;
-    speak(`Starting navigation. ${nextIncompleteStage().cue}`);
-    tick();
+    demoBtn.disabled = true;
+    renderProgress();
+    speak(`Starting navigation. ${currentTarget().cue}`);
+    loop();
   }
 
-  let tickHandle;
-  function tick() {
-    update();
-    tickHandle = requestAnimationFrame(tick);
+  function startDemo() {
+    stopLive(true);
+    AppState.currentStageIndex = 0;
+    lastAnnouncedStage = -1;
+    demoT = 0;
+    mode = "demo";
+    setBadge("Auto-demo", "demo");
+    startBtn.disabled = true;
+    demoBtn.disabled = true;
+    stopBtn.disabled = false;
+    renderStageList();
+    renderProgress();
+    speak("Running the auto-demo walkthrough.");
+
+    const durationMs = 16000;
+    const t0 = performance.now();
+    function step(now) {
+      if (mode !== "demo") return;
+      demoT = Math.min((now - t0) / durationMs, 1);
+      update();
+      if (demoT < 1) tickHandle = requestAnimationFrame(step);
+    }
+    tickHandle = requestAnimationFrame(step);
   }
 
-  function stop() {
-    if (stream) stream.getTracks().forEach(t => t.stop());
-    if (watchId) navigator.geolocation.clearWatch(watchId);
+  function stopLive(silent) {
+    if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+    if (watchId) { navigator.geolocation.clearWatch(watchId); watchId = null; }
     window.removeEventListener("deviceorientationabsolute", onOrientation, true);
     window.removeEventListener("deviceorientation", onOrientation, true);
+    if (mode === "live") mode = "idle";
+    if (!silent) resetUI();
+  }
+
+  function stopDemo(silent) {
+    if (mode === "demo") mode = "idle";
+    if (!silent) resetUI();
+  }
+
+  function resetUI() {
     cancelAnimationFrame(tickHandle);
+    mode = "idle";
+    setBadge("Idle");
     startBtn.disabled = false;
+    demoBtn.disabled = false;
     stopBtn.disabled = true;
     status.textContent = "Camera not started";
-    banner.textContent = "Start the camera to begin navigation.";
+    distanceEl.textContent = "—";
+    banner.textContent = "Start the camera or run the demo to begin navigation.";
+    arrow.style.transform = "rotate(0deg)";
   }
 
   simSlider.addEventListener("input", (e) => {
-    simMode = true;
-    simHeading = Number(e.target.value);
-    update();
+    manualHeading = Number(e.target.value);
+    if (mode === "live") update();
   });
 
-  startBtn.addEventListener("click", start);
-  stopBtn.addEventListener("click", stop);
+  startBtn.addEventListener("click", startLive);
+  demoBtn.addEventListener("click", startDemo);
+  stopBtn.addEventListener("click", () => { stopLive(); stopDemo(); resetUI(); });
 
-  window.ClearPathAR = { start, stop };
+  renderProgress();
+  window.ClearPathAR = { startLive, startDemo, stop: () => { stopLive(); stopDemo(); resetUI(); } };
 })();

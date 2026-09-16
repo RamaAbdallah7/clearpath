@@ -19,7 +19,8 @@
 
   const COMMANDS = [
     { match: /open map|journey map|show map/, action: () => goToScreen("journey") },
-    { match: /start navigation|navigate|open ar|ar navigate/, action: () => { goToScreen("ar"); window.ClearPathAR.start(); } },
+    { match: /start navigation|navigate|open ar|ar navigate/, action: () => { goToScreen("ar"); window.ClearPathAR.startLive(); } },
+    { match: /run demo|auto.?demo|demo mode/, action: () => { goToScreen("ar"); window.ClearPathAR.startDemo(); } },
     { match: /stop navigation/, action: () => window.ClearPathAR.stop() },
     { match: /open story|story ?book|pre.?visit story/, action: () => goToScreen("story") },
     { match: /open profile/, action: () => goToScreen("profile") },
@@ -30,7 +31,7 @@
     { match: /back|previous/, action: () => backAction() },
     { match: /read description|what.?s here|where am i/, action: () => readCurrent() },
     { match: /high contrast/, action: () => document.getElementById("contrastToggle").click() },
-    { match: /help/, action: () => speak("You can say: open map, start navigation, next, back, read description, report a barrier, or hands-free.") }
+    { match: /help/, action: () => speak("You can say: open map, start navigation, run demo, next, back, read description, report a barrier, or hands-free.") }
   ];
 
   function nextAction() {
