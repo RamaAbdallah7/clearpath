@@ -208,12 +208,15 @@ main p, main li, main label, main td, main th { font-size: var(--step-body); }
 .problem-card h2 { color: var(--warn); }
 .solution-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
 .solution-list li {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
   padding: 10px 12px;
-  border-left: 3px solid var(--accent);
   background: var(--surface-raised);
-  border-radius: 0 8px 8px 0;
+  border-radius: var(--radius-sm);
   font-size: 0.95rem;
 }
+.solution-list li svg { flex-shrink: 0; margin-top: 3px; color: var(--accent); }
 
 .caption-bar {
   position: fixed;
