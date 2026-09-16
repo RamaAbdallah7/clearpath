@@ -41,6 +41,9 @@
     noteEl.value = "";
     renderTable();
     announce("Added to checklist.");
+    toast("Added to accessibility checklist");
+    Sensory.earcon("barrier");
+    if (AppState.settings.haptics) Sensory.vibrate(50);
   }
 
   function exportChecklist() {
@@ -58,6 +61,7 @@
     a.href = URL.createObjectURL(blob);
     a.download = "clearpath-accessibility-checklist.txt";
     a.click();
+    toast("Checklist exported");
   }
 
   window.populateReportStageSelect = populateSelect;

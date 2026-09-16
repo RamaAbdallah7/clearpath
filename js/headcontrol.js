@@ -59,6 +59,8 @@
     if (!lastClickTarget) return;
     cursor.classList.add("clicking");
     setTimeout(() => cursor.classList.remove("clicking"), 220);
+    if (AppState.settings.haptics) Sensory.vibrate(35);
+    Sensory.earcon("toggle");
     lastClickTarget.click();
     speak((lastClickTarget.getAttribute("aria-label") || lastClickTarget.textContent.trim() || "Item") + " selected");
   }

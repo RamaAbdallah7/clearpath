@@ -5,12 +5,16 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>ClearPath — Al Jahili Park Accessible Arrival</title>
 <meta name="description" content="Hands-free, AR-guided arrival journey for Al Jahili Park — built for the KU x ZA Inclusion Innovation Hackathon, Challenge 1.">
+<meta name="theme-color" content="#0f1a14">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='6' fill='%232fbf87'/%3E%3Cpath d='M12 4 4 8l8 4 8-4-8-4Z' fill='%2306140d'/%3E%3Cpath d='M4 12l8 4 8-4' fill='none' stroke='%2306140d' stroke-width='1.6'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="css/style.css">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body data-contrast="normal">
 
+<a href="#main-content" class="skip-link">Skip to content</a>
 <div aria-live="polite" class="visually-hidden" id="announcer"></div>
+<div id="toastRegion" class="toast-region" aria-live="polite"></div>
 
 <!-- Virtual hands-free cursor: a real on-screen pointer driven by head position,
      not a focus-cycler. See js/headcontrol.js -->
@@ -38,15 +42,16 @@
   </div>
 </header>
 
-<main>
+<main id="main-content">
 
   <!-- HOME -->
   <section class="screen active" id="screen-home" aria-labelledby="home-h">
     <div class="hero" style="background-image:linear-gradient(180deg, rgba(11,30,20,0.15), rgba(8,20,14,0.86)), url('assets/photos/001-thumb.jpg')">
-      <span class="badge">Challenge 1 &middot; KU &times; ZA Hackathon</span>
+      <span class="badge">Focus Area 2 &middot; Vision &amp; Sensory Technology</span>
       <h2 id="home-h">Independent arrival, from parking to Al Jahili Park</h2>
       <p>A guided, hands-free route from the car park to the entrance and internal paths — with AR
-        directions, voice and head control, and a calm pre-visit story for children.</p>
+        directions, a proximity sound beacon, haptic pulses, voice and head control, and a calm
+        pre-visit story for children.</p>
       <div class="row">
         <button class="btn primary" data-goto="ar" type="button">Start AR navigation</button>
         <button class="btn ghost" data-goto="journey" type="button">See journey map</button>
@@ -56,7 +61,7 @@
     <div class="stat-row">
       <div class="stat-chip"><strong>5</strong><span>journey stages</span></div>
       <div class="stat-chip"><strong>24.22°N</strong><span>GIS-anchored route</span></div>
-      <div class="stat-chip"><strong>0</strong><span>touches required</span></div>
+      <div class="stat-chip"><strong>2.2B</strong><span>people live with vision impairment worldwide</span></div>
     </div>
 
     <div class="feature-grid">
@@ -117,6 +122,64 @@
         </button>
       </div>
     </div>
+
+    <div class="card">
+      <h2>Display &amp; sensory settings</h2>
+      <p style="color:var(--muted)">Sensory substitution controls, grounded in Focus Area 2's own
+        listed opportunities (Smart Navigation, Haptic Feedback, Sensory Substitution).</p>
+
+      <div class="settings-row">
+        <div>
+          <strong>Text size</strong>
+          <p>Scales every screen, not just this one.</p>
+        </div>
+        <div class="stepper" role="group" aria-label="Text size">
+          <button class="icon-btn" id="textSizeDown" type="button" aria-label="Decrease text size">A&minus;</button>
+          <span id="textSizeLabel">100%</span>
+          <button class="icon-btn" id="textSizeUp" type="button" aria-label="Increase text size">A&plus;</button>
+        </div>
+      </div>
+
+      <div class="settings-row">
+        <div>
+          <strong>Dyslexia-friendly spacing</strong>
+          <p>Wider letter and line spacing for easier reading.</p>
+        </div>
+        <button class="switch" id="dyslexiaToggle" type="button" role="switch" aria-checked="false"><span></span></button>
+      </div>
+
+      <div class="settings-row">
+        <div>
+          <strong>High contrast</strong>
+          <p>Maximum contrast, yellow-on-black.</p>
+        </div>
+        <button class="switch" id="contrastSwitch" type="button" role="switch" aria-checked="false"><span></span></button>
+      </div>
+
+      <div class="settings-row">
+        <div>
+          <strong>Proximity sound beacon</strong>
+          <p>Beeps faster as you approach the next stage — audio-only distance sense, no need to look at the screen.</p>
+        </div>
+        <button class="switch" id="beaconToggle" type="button" role="switch" aria-checked="false"><span></span></button>
+      </div>
+
+      <div class="settings-row">
+        <div>
+          <strong>Haptic pulses</strong>
+          <p>Vibrates on stage arrival and confirmations (phone hardware required).</p>
+        </div>
+        <button class="switch" id="hapticsToggle" type="button" role="switch" aria-checked="true"><span></span></button>
+      </div>
+
+      <div class="settings-row">
+        <div>
+          <strong>Language</strong>
+          <p>Interface and voice cues.</p>
+        </div>
+        <button class="btn secondary" id="langToggleSettings" type="button">English / العربية</button>
+      </div>
+    </div>
   </section>
 
   <!-- JOURNEY MAP -->
@@ -146,6 +209,11 @@
         <button class="btn ghost" id="arDemo" type="button">▶ Run auto-demo</button>
         <button class="btn secondary" id="arStop" type="button" disabled>Stop</button>
       </div>
+
+      <label class="audio-first-toggle" for="audioFirstToggle">
+        <input type="checkbox" id="audioFirstToggle">
+        <span>Audio-first mode — proximity beeps + haptics, minimal screen</span>
+      </label>
 
       <div class="ar-wrap" id="arWrap" style="margin-top:14px;">
         <video id="arVideo" autoplay playsinline muted></video>
@@ -284,6 +352,8 @@
 </nav>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="js/toast.js"></script>
+<script src="js/sensory.js"></script>
 <script src="js/journey-data.js"></script>
 <script src="js/storybook-data.js"></script>
 <script src="js/app.js"></script>

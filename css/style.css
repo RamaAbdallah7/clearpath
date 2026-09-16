@@ -32,14 +32,17 @@
 }
 
 * { box-sizing: border-box; }
-html, body {
-  margin: 0; padding: 0;
+html { font-size: 16px; }
+html, body { margin: 0; padding: 0; }
+body {
   background: var(--bg);
   color: var(--text);
   font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
-  font-size: 18px;
+  font-size: 1.125rem;
   line-height: 1.5;
 }
+body.dyslexia-friendly { letter-spacing: 0.02em; line-height: 1.8; }
+body.dyslexia-friendly p, body.dyslexia-friendly li { word-spacing: 0.08em; }
 
 a, button, input, select, [tabindex] { min-height: 44px; }
 a { color: var(--accent); }
@@ -48,6 +51,44 @@ a { color: var(--accent); }
   outline: 3px solid var(--focus);
   outline-offset: 2px;
 }
+
+.skip-link {
+  position: absolute;
+  top: -60px; left: 8px;
+  background: var(--focus);
+  color: #06140d;
+  padding: 10px 16px;
+  border-radius: 8px;
+  z-index: 999;
+  font-weight: 700;
+  transition: top 0.15s;
+}
+.skip-link:focus { top: 8px; }
+
+.toast-region {
+  position: fixed;
+  top: 12px; left: 50%;
+  transform: translateX(-50%);
+  z-index: 998;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+  pointer-events: none;
+}
+.toast {
+  background: var(--surface-raised);
+  border: 1px solid var(--accent);
+  color: var(--text);
+  padding: 10px 18px;
+  border-radius: 999px;
+  box-shadow: var(--shadow);
+  opacity: 0;
+  transform: translateY(-8px);
+  transition: opacity 0.2s, transform 0.2s;
+  font-size: 0.9rem;
+}
+.toast.show { opacity: 1; transform: translateY(0); }
 
 /* Head-driven virtual cursor */
 .head-cursor {
@@ -400,6 +441,68 @@ video.headcam-preview {
   border: 1px solid var(--border);
   transform: scaleX(-1);
 }
+.settings-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 0;
+  border-top: 1px solid var(--border);
+}
+.settings-row:first-of-type { border-top: none; }
+.settings-row strong { display: block; }
+.settings-row p { margin: 2px 0 0; font-size: 0.85rem; color: var(--muted); }
+
+.switch {
+  width: 52px; height: 30px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface-raised);
+  position: relative;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.switch span {
+  position: absolute;
+  top: 3px; left: 3px;
+  width: 22px; height: 22px;
+  border-radius: 50%;
+  background: var(--muted);
+  transition: transform 0.15s, background 0.15s;
+}
+.switch[aria-checked="true"] { background: rgba(47,191,135,0.25); border-color: var(--accent); }
+.switch[aria-checked="true"] span { transform: translateX(22px); background: var(--accent); }
+
+.stepper {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+.stepper span { min-width: 42px; text-align: center; font-variant-numeric: tabular-nums; }
+
+.audio-first-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 0.9rem;
+  color: var(--muted);
+  cursor: pointer;
+}
+.audio-first-toggle input { width: 20px; height: 20px; accent-color: var(--accent); }
+
+.ar-wrap.audio-first video { filter: brightness(0.35); }
+.ar-wrap.audio-first .ar-banner {
+  font-size: 1.3rem;
+  font-weight: 700;
+  padding-top: 40px;
+}
+.ar-wrap.audio-first .ar-arrow { width: 130px; height: 130px; margin: -65px 0 0 -65px; }
+
 .headcam-dot {
   position: absolute;
   width: 14px; height: 14px;

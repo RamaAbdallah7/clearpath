@@ -100,15 +100,23 @@
       status.textContent = currentPos ? `GPS locked · heading ${Math.round(heading)}°` : "Waiting for GPS — use manual heading below";
     }
 
+    if (AppState.settings.beacon) Sensory.beaconSetDistance(dist);
+
     if (dist < 15 && lastAnnouncedStage !== AppState.currentStageIndex) {
       lastAnnouncedStage = AppState.currentStageIndex;
       speak(target.cue);
+      if (AppState.settings.haptics) Sensory.vibrate([70, 40, 70]);
       if (AppState.currentStageIndex < JOURNEY.length - 1) {
+        Sensory.earcon("stage");
         AppState.currentStageIndex++;
         renderStageList();
         renderProgress();
-      } else if (mode === "demo") {
-        setTimeout(() => { speak("Demo complete. You've arrived at the park."); stopDemo(); }, 300);
+      } else {
+        Sensory.earcon("arrive");
+        if (AppState.settings.haptics) Sensory.vibrate([100, 60, 100, 60, 180]);
+        if (mode === "demo") {
+          setTimeout(() => { speak("Demo complete. You've arrived at the park."); stopDemo(); }, 300);
+        }
       }
     }
   }
@@ -198,6 +206,7 @@
 
   function resetUI() {
     cancelAnimationFrame(tickHandle);
+    Sensory.beaconStop();
     mode = "idle";
     setBadge("Idle");
     startBtn.disabled = false;
