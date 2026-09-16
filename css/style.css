@@ -1,14 +1,18 @@
 :root {
-  --bg: #f7f5ef;
+  --bg: #eef2ee;
   --surface: #ffffff;
   --text: #1c1b18;
   --muted: #5b584f;
   --accent: #1f6f54;
   --accent-contrast: #ffffff;
   --warn: #a8461e;
-  --border: #ddd8c9;
+  --border: #d3ddd4;
   --focus: #0b62d6;
   --radius: 14px;
+  --step-body: 1rem;
+  --step-h3: 1.25rem;
+  --step-h2: 1.6rem;
+  --step-h1: 2rem;
 }
 [data-contrast="high"] {
   --bg: #000000;
@@ -51,7 +55,7 @@ header.app-header {
   flex-wrap: wrap;
 }
 header.app-header h1 {
-  font-size: 1.4rem;
+  font-size: var(--step-h1);
   margin: 0;
 }
 header.app-header .tag {
@@ -106,6 +110,9 @@ main {
   padding: 18px;
   margin-bottom: 16px;
 }
+.card h2 { font-size: var(--step-h2); margin-top: 0; }
+.card h3 { font-size: var(--step-h3); }
+main p, main li, main label, main td, main th { font-size: var(--step-body); }
 
 .btn {
   display: inline-flex;
