@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ClearPath — Al Jahili Park Accessible Arrival</title>
+<meta name="description" content="Hands-free, AR-guided arrival journey for Al Jahili Park — built for the KU x ZA Inclusion Innovation Hackathon, Challenge 1.">
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+</head>
+<body data-contrast="normal">
+
+<div aria-live="polite" class="visually-hidden" id="announcer"></div>
+
+<header class="app-header">
+  <div>
+    <h1>ClearPath</h1>
+    <div class="tag">Al Jahili Park · Independent arrival journey</div>
+  </div>
+  <div class="row">
+    <button class="btn secondary" id="contrastToggle" type="button" aria-pressed="false">High contrast</button>
+    <button class="btn secondary" id="langToggle" type="button">EN / AR</button>
+  </div>
+</header>
+
+<nav class="tabbar" id="tabbar" aria-label="App sections">
+  <button data-screen="home" aria-selected="true">Home</button>
+  <button data-screen="profile" aria-selected="false">Profile</button>
+  <button data-screen="journey" aria-selected="false">Journey Map</button>
+  <button data-screen="ar" aria-selected="false">AR Navigate</button>
+  <button data-screen="story" aria-selected="false">Pre-Visit Story</button>
+  <button data-screen="report" aria-selected="false">Report &amp; Checklist</button>
+  <button data-screen="access" aria-selected="false">Hands-Free Setup</button>
+</nav>
+
+<main>
+
+  <!-- HOME -->
+  <section class="screen active" id="screen-home" aria-labelledby="home-h">
+    <div class="card">
+      <h2 id="home-h">Independent journey from parking to Al Jahili Park</h2>
+      <p>ClearPath guides a Person of Determination from the car park to the park entrance and internal
+        paths — with a clear route, step-by-step audio and AR cues, and hands-free control by voice or
+        head movement, so no one has to guess or ask for help.</p>
+      <p class="tag" style="color:var(--muted)">Built for the Khalifa University × Zayed Authority for People of
+        Determination Inclusion Innovation Hackathon — Challenge 1 (Al Jahili Park).</p>
+      <div class="row">
+        <button class="btn big" data-goto="journey" type="button">See the journey map</button>
+        <button class="btn big secondary" data-goto="ar" type="button">Start AR navigation</button>
+      </div>
+    </div>
+    <div class="card">
+      <h3>What's inside</h3>
+      <ul>
+        <li><strong>Journey Map</strong> — real GIS-anchored route with a confidence score per stage.</li>
+        <li><strong>AR Navigate</strong> — camera view with a live arrow pointing to the next stage.</li>
+        <li><strong>Hands-Free Setup</strong> — control the whole app by voice or head-tilt + blink, no touch needed.</li>
+        <li><strong>Pre-Visit Story</strong> — a calm, illustrated walkthrough to prepare a child before arrival.</li>
+        <li><strong>Report &amp; Checklist</strong> — flag a barrier and export an accessibility checklist for the municipality.</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- PROFILE -->
+  <section class="screen" id="screen-profile" aria-labelledby="profile-h">
+    <div class="card">
+      <h2 id="profile-h">Accessibility profile</h2>
+      <p>Choose what matters for your visit. This changes what the journey map highlights and how AR cues are phrased. Deliberately kept to four toggles.</p>
+      <div class="profile-grid" id="profileGrid">
+        <button class="profile-toggle" data-profile="mobility" aria-pressed="false" type="button">
+          <span class="emoji" aria-hidden="true">🦽</span>Uses mobility aid
+        </button>
+        <button class="profile-toggle" data-profile="vision" aria-pressed="false" type="button">
+          <span class="emoji" aria-hidden="true">🦯</span>Low vision / blind
+        </button>
+        <button class="profile-toggle" data-profile="quiet" aria-pressed="false" type="button">
+          <span class="emoji" aria-hidden="true">🎧</span>Needs quiet route
+        </button>
+        <button class="profile-toggle" data-profile="heat" aria-pressed="false" type="button">
+          <span class="emoji" aria-hidden="true">🌤️</span>Heat-sensitive
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <!-- JOURNEY MAP -->
+  <section class="screen" id="screen-journey" aria-labelledby="journey-h">
+    <div class="card">
+      <h2 id="journey-h">Journey map</h2>
+      <div id="map"></div>
+    </div>
+    <div class="card">
+      <h3>Stages</h3>
+      <ol class="stage-list" id="stageList"></ol>
+    </div>
+  </section>
+
+  <!-- AR NAVIGATE -->
+  <section class="screen" id="screen-ar" aria-labelledby="ar-h">
+    <div class="card">
+      <h2 id="ar-h">AR navigate</h2>
+      <p>Point your camera forward. An arrow shows the direction to the next stage; text and voice
+        confirm what's ahead. Works best outdoors on a phone with GPS and compass.</p>
+      <div class="row">
+        <button class="btn" id="arStart" type="button">Start camera</button>
+        <button class="btn secondary" id="arStop" type="button" disabled>Stop</button>
+      </div>
+      <div class="ar-wrap" id="arWrap" style="margin-top:12px;">
+        <video id="arVideo" autoplay playsinline muted></video>
+        <div class="ar-status" id="arStatus">Camera not started</div>
+        <svg class="ar-arrow" id="arArrow" viewBox="0 0 100 100" aria-hidden="true">
+          <polygon points="50,8 78,60 58,60 58,92 42,92 42,60 22,60" fill="#ffd400" stroke="#000" stroke-width="3"/>
+        </svg>
+        <div class="ar-banner" id="arBanner">Start the camera to begin navigation.</div>
+      </div>
+      <p style="color:var(--muted); font-size:0.9rem; margin-top:10px;">
+        No GPS/compass sensor? Use the manual simulator below to demo the arrow logic.
+      </p>
+      <div class="row">
+        <label for="simBearing">Simulate device heading</label>
+        <input type="range" id="simBearing" min="0" max="359" value="0">
+      </div>
+    </div>
+  </section>
+
+  <!-- PRE-VISIT STORY -->
+  <section class="screen" id="screen-story" aria-labelledby="story-h">
+    <div class="card">
+      <h2 id="story-h">Pre-visit story</h2>
+      <p style="color:var(--muted)">A calm walkthrough of what the visit will look and feel like — helps reduce anxiety about the unfamiliar before arriving.</p>
+      <div class="story-page" id="storyPage"></div>
+      <div class="row between" style="margin-top:14px;">
+        <button class="btn secondary" id="storyBack" type="button">◀ Back</button>
+        <span id="storyProgress" style="color:var(--muted)"></span>
+        <button class="btn" id="storyNext" type="button">Next ▶</button>
+      </div>
+      <div class="row" style="margin-top:10px;">
+        <button class="btn secondary" id="storyRead" type="button">🔊 Read this page aloud</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- REPORT & CHECKLIST -->
+  <section class="screen" id="screen-report" aria-labelledby="report-h">
+    <div class="card">
+      <h2 id="report-h">Report a barrier</h2>
+      <label for="reportStage">Where?</label>
+      <select id="reportStage"></select>
+      <label for="reportNote" style="margin-top:10px; display:block;">What did you notice?</label>
+      <textarea id="reportNote" rows="3" placeholder="e.g. Uneven paving near the entrance bench"></textarea>
+      <div class="row" style="margin-top:10px;">
+        <button class="btn" id="reportAdd" type="button">Add to checklist</button>
+        <button class="btn secondary" id="reportVoice" type="button">🎤 Dictate note</button>
+      </div>
+    </div>
+    <div class="card">
+      <h3>Accessibility arrival checklist</h3>
+      <p style="color:var(--muted); font-size:0.9rem;">Exportable summary for the municipality team, per the challenge brief's own suggested direction.</p>
+      <table class="report-table" id="reportTable">
+        <thead><tr><th>Stage</th><th>Note</th><th>Time</th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <button class="btn secondary" id="reportExport" type="button" style="margin-top:10px;">⬇ Export checklist (.txt)</button>
+    </div>
+  </section>
+
+  <!-- HANDS-FREE SETUP -->
+  <section class="screen" id="screen-access" aria-labelledby="access-h">
+    <div class="card">
+      <h2 id="access-h">Hands-free control</h2>
+      <p style="color:var(--muted)">Control every screen without touching the device — by voice command or by head-tilt + blink, adapted from our earlier
+        <a href="https://github.com/RamaAbdallah7/SWE-headAndVoice" target="_blank" rel="noopener">head &amp; voice control project</a>,
+        reworked here to run fully in-browser on a phone or laptop camera.</p>
+
+      <h3>Voice control</h3>
+      <div class="row" style="align-items:center;">
+        <button class="btn" id="voiceToggle" type="button">🎤 Start listening</button>
+        <span class="mic-indicator" id="micIndicator"><span class="dot"></span><span id="micLabel">Off</span></span>
+      </div>
+      <p style="font-size:0.9rem; color:var(--muted); margin-top:8px;">
+        Try saying: "open map", "start navigation", "next", "back", "read description", "where am I", "report a barrier", "help".
+      </p>
+      <div id="voiceLog" style="font-size:0.9rem; color:var(--muted); margin-top:6px;"></div>
+
+      <h3 style="margin-top:22px;">Head-tilt + blink control</h3>
+      <div class="row" style="align-items:flex-start;">
+        <video class="headcam-preview" id="headVideo" autoplay playsinline muted></video>
+        <div>
+          <div class="row">
+            <button class="btn" id="headToggle" type="button">👤 Start head control</button>
+          </div>
+          <p style="font-size:0.9rem; color:var(--muted); margin-top:8px; max-width:320px;">
+            Tilt your head left/right to move focus across the tabs above; blink to select. Mirrors the
+            eye/head-tracking approach from our earlier desktop project, adapted for the browser.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<div class="control-bar">
+  <button class="btn" data-goto="ar" type="button">🎯 Navigate</button>
+  <button class="btn secondary" data-goto="story" type="button">📖 Story</button>
+  <button class="btn secondary" data-goto="access" type="button">🖐️ Hands-free</button>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="js/journey-data.js"></script>
+<script src="js/storybook-data.js"></script>
+<script src="js/app.js"></script>
+<script src="js/map.js"></script>
+<script src="js/ar.js"></script>
+<script src="js/voice.js"></script>
+<script src="js/storybook.js"></script>
+<script src="js/report.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js"></script>
+<script src="js/headcontrol.js"></script>
+</body>
+</html>
