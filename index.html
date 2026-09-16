@@ -201,19 +201,26 @@
         <h2 id="ar-h" style="margin-bottom:4px;">AR navigate</h2>
         <span class="mode-badge" id="arModeBadge">Idle</span>
       </div>
-      <p>Point your camera forward outdoors and an arrow tracks the next stage using your phone's GPS
-        and compass. No camera or sensors here? Run the self-guided demo instead — it walks the whole
-        route for you.</p>
+      <p>Three ways to run it: <strong>Live</strong> uses real GPS + compass at the park. <strong>Classroom
+        demo</strong> uses your device's real camera and real compass right now — turn around and watch
+        the arrow track a simulated target live. <strong>Auto-demo</strong> needs no sensors at all.</p>
       <div class="row">
-        <button class="btn primary" id="arStart" type="button">Start camera</button>
-        <button class="btn ghost" id="arDemo" type="button">▶ Run auto-demo</button>
+        <button class="btn primary" id="arStart" type="button">Live (GPS)</button>
+        <button class="btn primary" id="arClassroom" type="button">🎓 Classroom demo</button>
+        <button class="btn ghost" id="arDemo" type="button">▶ Auto-demo</button>
         <button class="btn secondary" id="arStop" type="button" disabled>Stop</button>
       </div>
 
-      <label class="audio-first-toggle" for="audioFirstToggle">
-        <input type="checkbox" id="audioFirstToggle">
-        <span>Audio-first mode — proximity beeps + haptics, minimal screen</span>
-      </label>
+      <div class="row" style="margin-top:10px;">
+        <label class="audio-first-toggle" for="audioFirstToggle" style="flex:1; margin-top:0;">
+          <input type="checkbox" id="audioFirstToggle">
+          <span>Audio-first mode — proximity beeps + haptics, minimal screen</span>
+        </label>
+        <label class="audio-first-toggle" for="glassHudToggle" style="flex:1; margin-top:0;">
+          <input type="checkbox" id="glassHudToggle">
+          <span>Smart-glasses HUD preview — minimalist wearable-style overlay</span>
+        </label>
+      </div>
 
       <div class="ar-wrap" id="arWrap" style="margin-top:14px;">
         <video id="arVideo" autoplay playsinline muted></video>
@@ -225,11 +232,12 @@
           <polygon points="50,6 80,62 58,62 58,94 42,94 42,62 20,62" fill="#ffd400" stroke="#0a1f16" stroke-width="4"/>
         </svg>
         <div class="ar-progress" id="arProgress"></div>
-        <div class="ar-banner" id="arBanner">Start the camera or run the demo to begin navigation.</div>
+        <div class="ar-banner" id="arBanner">Choose Live, Classroom demo, or Auto-demo to begin.</div>
+        <button class="btn primary ar-next-stage" id="arClassroomNext" type="button" hidden>Advance to next stage &rarr;</button>
       </div>
 
       <div class="row" style="margin-top:14px; align-items:center;">
-        <label for="simBearing" style="min-width:170px;">Manual heading (no sensors)</label>
+        <label for="simBearing" style="min-width:170px;">Manual heading (fallback, no compass)</label>
         <input type="range" id="simBearing" min="0" max="359" value="0">
       </div>
     </div>

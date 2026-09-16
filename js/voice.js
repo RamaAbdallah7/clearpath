@@ -21,6 +21,7 @@
     { match: /open map|journey map|show map/, action: () => goToScreen("journey") },
     { match: /start navigation|navigate|open ar|ar navigate/, action: () => { goToScreen("ar"); window.ClearPathAR.startLive(); } },
     { match: /run demo|auto.?demo|demo mode/, action: () => { goToScreen("ar"); window.ClearPathAR.startDemo(); } },
+    { match: /classroom/, action: () => { goToScreen("ar"); window.ClearPathAR.startClassroom(); } },
     { match: /stop navigation/, action: () => window.ClearPathAR.stop() },
     { match: /open story|story ?book|pre.?visit story/, action: () => goToScreen("story") },
     { match: /open profile/, action: () => goToScreen("profile") },

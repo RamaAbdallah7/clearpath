@@ -3,11 +3,12 @@
   let watchId = null;
   let currentPos = null;
   let currentHeading = null;
-  let mode = "idle"; // idle | live | demo
+  let mode = "idle"; // idle | live | demo | classroom
   let demoT = 0; // 0..1 progress across the whole route
   let lastAnnouncedStage = -1;
   let tickHandle = null;
   let manualHeading = null;
+  let orientationSupported = false;
 
   const video = document.getElementById("arVideo");
   const arrow = document.getElementById("arArrow");
@@ -18,8 +19,17 @@
   const progress = document.getElementById("arProgress");
   const startBtn = document.getElementById("arStart");
   const demoBtn = document.getElementById("arDemo");
+  const classroomBtn = document.getElementById("arClassroom");
+  const classroomNextBtn = document.getElementById("arClassroomNext");
   const stopBtn = document.getElementById("arStop");
   const simSlider = document.getElementById("simBearing");
+  const glassToggle = document.getElementById("glassHudToggle");
+
+  // Simulated compass bearings for each stage, used only in Classroom Demo
+  // mode where there's no real GPS to compute a real bearing from. Spread
+  // around the full circle so a presenter turning around the room sees the
+  // arrow sweep through a realistic range.
+  const CLASSROOM_TARGET_BEARINGS = [35, 120, 205, 265, 330];
 
   function toRad(d) { return d * Math.PI / 180; }
   function toDeg(r) { return r * 180 / Math.PI; }
@@ -61,7 +71,6 @@
   }
 
   function demoPosition() {
-    // Walk a straight line from just before stage 0 through all stages, looping.
     const startPos = { lat: JOURNEY[0].lat - 0.0004, lng: JOURNEY[0].lng - 0.00035 };
     const points = [startPos, ...JOURNEY.map(s => ({ lat: s.lat, lng: s.lng }))];
     const segCount = points.length - 1;
@@ -72,52 +81,66 @@
     return { lat: lerp(a.lat, b.lat, segT), lng: lerp(a.lng, b.lng, segT) };
   }
 
+  function advanceStage(finalMessage) {
+    speak(currentTarget().cue);
+    if (AppState.settings.haptics) Sensory.vibrate([70, 40, 70]);
+    if (AppState.currentStageIndex < JOURNEY.length - 1) {
+      Sensory.earcon("stage");
+      AppState.currentStageIndex++;
+      renderStageList();
+      renderProgress();
+    } else {
+      Sensory.earcon("arrive");
+      if (AppState.settings.haptics) Sensory.vibrate([100, 60, 100, 60, 180]);
+      if (finalMessage) setTimeout(finalMessage, 300);
+    }
+  }
+
   function update() {
     const target = currentTarget();
-    let pos, heading;
+    let pos, heading, bearing, dist;
 
     if (mode === "demo") {
       pos = demoPosition();
-      heading = bearingTo(pos, { lat: target.lat, lng: target.lng });
+      bearing = bearingTo(pos, { lat: target.lat, lng: target.lng });
+      heading = bearing; // demo camera is conceptually always facing the route
+      dist = Math.round(distanceMeters(pos, { lat: target.lat, lng: target.lng }));
     } else if (mode === "live") {
       pos = currentPos || { lat: JOURNEY[0].lat - 0.0006, lng: JOURNEY[0].lng - 0.0005 };
       heading = manualHeading != null ? manualHeading : (currentHeading ?? 0);
+      bearing = bearingTo(pos, { lat: target.lat, lng: target.lng });
+      dist = Math.round(distanceMeters(pos, { lat: target.lat, lng: target.lng }));
+    } else if (mode === "classroom") {
+      heading = currentHeading != null ? currentHeading : (manualHeading ?? 0);
+      bearing = CLASSROOM_TARGET_BEARINGS[AppState.currentStageIndex] ?? 0;
+      dist = null;
     } else {
       return;
     }
 
-    const bearing = bearingTo(pos, { lat: target.lat, lng: target.lng });
-    const dist = Math.round(distanceMeters(pos, { lat: target.lat, lng: target.lng }));
     const relative = ((bearing - heading) + 360) % 360;
-
     arrow.style.transform = `rotate(${relative}deg)`;
-    distanceEl.textContent = `${dist} m ahead`;
     banner.textContent = `Stage ${target.stage}/${JOURNEY.length}: ${target.title} — ${target.cue}`;
 
     if (mode === "demo") {
+      distanceEl.textContent = `${dist} m ahead`;
       status.textContent = `Auto-demo · heading ${Math.round(heading)}°`;
-    } else {
+    } else if (mode === "live") {
+      distanceEl.textContent = `${dist} m ahead`;
       status.textContent = currentPos ? `GPS locked · heading ${Math.round(heading)}°` : "Waiting for GPS — use manual heading below";
+    } else if (mode === "classroom") {
+      const off = Math.round(Math.min(relative, 360 - relative));
+      distanceEl.textContent = off < 15 ? "Facing it!" : `${off}° to turn`;
+      status.textContent = orientationSupported
+        ? `Classroom demo · real compass ${Math.round(heading)}°`
+        : "No compass detected · drag manual heading below";
     }
 
-    if (AppState.settings.beacon) Sensory.beaconSetDistance(dist);
+    if (mode !== "classroom" && AppState.settings.beacon) Sensory.beaconSetDistance(dist);
 
-    if (dist < 15 && lastAnnouncedStage !== AppState.currentStageIndex) {
+    if ((mode === "demo" || mode === "live") && dist < 15 && lastAnnouncedStage !== AppState.currentStageIndex) {
       lastAnnouncedStage = AppState.currentStageIndex;
-      speak(target.cue);
-      if (AppState.settings.haptics) Sensory.vibrate([70, 40, 70]);
-      if (AppState.currentStageIndex < JOURNEY.length - 1) {
-        Sensory.earcon("stage");
-        AppState.currentStageIndex++;
-        renderStageList();
-        renderProgress();
-      } else {
-        Sensory.earcon("arrive");
-        if (AppState.settings.haptics) Sensory.vibrate([100, 60, 100, 60, 180]);
-        if (mode === "demo") {
-          setTimeout(() => { speak("Demo complete. You've arrived at the park."); stopDemo(); }, 300);
-        }
-      }
+      advanceStage(mode === "demo" ? () => { speak("Demo complete. You've arrived at the park."); stopDemo(); } : null);
     }
   }
 
@@ -129,23 +152,40 @@
   function onOrientation(e) {
     let heading = e.webkitCompassHeading;
     if (heading === undefined) heading = e.alpha != null ? (360 - e.alpha) % 360 : null;
-    if (heading != null) currentHeading = heading;
+    if (heading != null) { currentHeading = heading; orientationSupported = true; }
   }
 
-  async function startLive() {
-    stopDemo(true);
-    try {
-      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: false });
-      video.srcObject = stream;
-    } catch (err) {
-      status.textContent = "Camera unavailable — try the auto-demo instead.";
-    }
-
+  async function requestOrientation() {
     if (window.DeviceOrientationEvent && typeof DeviceOrientationEvent.requestPermission === "function") {
       try { await DeviceOrientationEvent.requestPermission(); } catch (_) {}
     }
+    orientationSupported = false;
+    currentHeading = null;
     window.addEventListener("deviceorientationabsolute", onOrientation, true);
     window.addEventListener("deviceorientation", onOrientation, true);
+  }
+
+  async function startCamera(facingMode) {
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode }, audio: false });
+      video.srcObject = stream;
+      return true;
+    } catch (err) {
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+        video.srcObject = stream;
+        return true;
+      } catch (err2) {
+        status.textContent = "Camera unavailable — try auto-demo instead.";
+        return false;
+      }
+    }
+  }
+
+  async function startLive() {
+    stopAll(true);
+    await startCamera("environment");
+    await requestOrientation();
 
     if (navigator.geolocation) {
       watchId = navigator.geolocation.watchPosition(
@@ -157,24 +197,37 @@
 
     mode = "live";
     setBadge("Live", "live");
-    startBtn.disabled = true;
-    stopBtn.disabled = false;
-    demoBtn.disabled = true;
+    setButtons({ start: true, classroom: true, demo: true, stop: false });
     renderProgress();
     speak(`Starting navigation. ${currentTarget().cue}`);
     loop();
   }
 
+  async function startClassroom() {
+    stopAll(true);
+    AppState.currentStageIndex = 0;
+    lastAnnouncedStage = -1;
+    await startCamera("environment");
+    await requestOrientation();
+
+    mode = "classroom";
+    setBadge("Classroom", "classroom");
+    setButtons({ start: true, classroom: true, demo: true, stop: false });
+    classroomNextBtn.hidden = false;
+    renderStageList();
+    renderProgress();
+    speak("Classroom demo ready. Turn around slowly — the arrow tracks a simulated target using your real compass. Tap advance to move through the stages.");
+    loop();
+  }
+
   function startDemo() {
-    stopLive(true);
+    stopAll(true);
     AppState.currentStageIndex = 0;
     lastAnnouncedStage = -1;
     demoT = 0;
     mode = "demo";
     setBadge("Auto-demo", "demo");
-    startBtn.disabled = true;
-    demoBtn.disabled = true;
-    stopBtn.disabled = false;
+    setButtons({ start: true, classroom: true, demo: true, stop: false });
     renderStageList();
     renderProgress();
     speak("Running the auto-demo walkthrough.");
@@ -190,43 +243,65 @@
     tickHandle = requestAnimationFrame(step);
   }
 
-  function stopLive(silent) {
+  function classroomAdvance() {
+    if (mode !== "classroom") return;
+    advanceStage(() => {
+      speak("That's the full route. At the real park this arrow would now be pointing at the entrance.");
+      stopAll();
+    });
+  }
+
+  function stopSensors() {
     if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
     if (watchId) { navigator.geolocation.clearWatch(watchId); watchId = null; }
     window.removeEventListener("deviceorientationabsolute", onOrientation, true);
     window.removeEventListener("deviceorientation", onOrientation, true);
-    if (mode === "live") mode = "idle";
-    if (!silent) resetUI();
+    Sensory.beaconStop();
   }
 
-  function stopDemo(silent) {
-    if (mode === "demo") mode = "idle";
+  function stopAll(silent) {
+    stopSensors();
+    cancelAnimationFrame(tickHandle);
+    mode = "idle";
     if (!silent) resetUI();
+  }
+  // kept for the earlier per-mode call sites
+  function stopLive(silent) { stopAll(silent); }
+  function stopDemo(silent) { stopAll(silent); }
+
+  function setButtons({ start, classroom, demo, stop }) {
+    startBtn.disabled = start;
+    classroomBtn.disabled = classroom;
+    demoBtn.disabled = demo;
+    stopBtn.disabled = stop;
   }
 
   function resetUI() {
-    cancelAnimationFrame(tickHandle);
-    Sensory.beaconStop();
-    mode = "idle";
     setBadge("Idle");
-    startBtn.disabled = false;
-    demoBtn.disabled = false;
-    stopBtn.disabled = true;
+    setButtons({ start: false, classroom: false, demo: false, stop: true });
+    classroomNextBtn.hidden = true;
     status.textContent = "Camera not started";
     distanceEl.textContent = "—";
-    banner.textContent = "Start the camera or run the demo to begin navigation.";
+    banner.textContent = "Choose Live, Classroom demo, or Auto-demo to begin.";
     arrow.style.transform = "rotate(0deg)";
   }
 
   simSlider.addEventListener("input", (e) => {
     manualHeading = Number(e.target.value);
-    if (mode === "live") update();
+    if (mode === "live" || mode === "classroom") update();
+  });
+
+  glassToggle.addEventListener("change", (e) => {
+    document.getElementById("arWrap").classList.toggle("glass-hud", e.target.checked);
+    Sensory.earcon("toggle");
   });
 
   startBtn.addEventListener("click", startLive);
+  classroomBtn.addEventListener("click", startClassroom);
   demoBtn.addEventListener("click", startDemo);
-  stopBtn.addEventListener("click", () => { stopLive(); stopDemo(); resetUI(); });
+  classroomNextBtn.addEventListener("click", classroomAdvance);
+  stopBtn.addEventListener("click", () => stopAll());
 
   renderProgress();
-  window.ClearPathAR = { startLive, startDemo, stop: () => { stopLive(); stopDemo(); resetUI(); } };
+  window.ClearPathAR = { startLive, startDemo, startClassroom, stop: () => stopAll() };
 })();

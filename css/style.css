@@ -333,6 +333,7 @@ main p, main li, main label, main td, main th { font-size: var(--step-body); }
 }
 .mode-badge.live { color: #ff9b8a; border-color: var(--warn); }
 .mode-badge.demo { color: #ffd166; border-color: #ffd166; }
+.mode-badge.classroom { color: #8ec6ff; border-color: #8ec6ff; }
 
 .ar-wrap {
   position: relative;
@@ -502,6 +503,44 @@ video.headcam-preview {
   padding-top: 40px;
 }
 .ar-wrap.audio-first .ar-arrow { width: 130px; height: 130px; margin: -65px 0 0 -65px; }
+
+.ar-next-stage {
+  position: absolute;
+  bottom: 76px; left: 16px; right: 16px;
+  width: auto;
+}
+
+/* Smart-glasses HUD preview — a minimalist monochrome wearable-style
+   overlay, the one Focus Area 2 "AI-Powered Solution" (Smart Glasses &
+   Wearables) not otherwise covered by the phone-based AR/beacon/haptics. */
+.ar-wrap.glass-hud video { filter: grayscale(1) brightness(0.6) contrast(1.2); }
+.ar-wrap.glass-hud .ar-arrow polygon { fill: #7fe6ff; stroke: #04262e; }
+.ar-wrap.glass-hud .ar-hud-top,
+.ar-wrap.glass-hud .ar-banner {
+  color: #7fe6ff;
+  font-family: monospace;
+  background: linear-gradient(180deg, rgba(4,20,24,0.75), transparent);
+  text-shadow: 0 0 6px rgba(127,230,255,0.6);
+}
+.ar-wrap.glass-hud::before {
+  content: "";
+  position: absolute;
+  inset: 14px;
+  border: 1px solid rgba(127,230,255,0.5);
+  border-radius: 10px;
+  pointer-events: none;
+}
+.ar-wrap.glass-hud::after {
+  content: "◤ SMART GLASSES PREVIEW ◢";
+  position: absolute;
+  top: 44%; left: 50%;
+  transform: translate(-50%, -50%);
+  color: rgba(127,230,255,0.35);
+  font-family: monospace;
+  font-size: 0.7rem;
+  letter-spacing: 0.12em;
+  pointer-events: none;
+}
 
 .headcam-dot {
   position: absolute;
