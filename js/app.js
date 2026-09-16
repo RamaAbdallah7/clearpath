@@ -14,16 +14,36 @@ function announce(text) {
   requestAnimationFrame(() => { el.textContent = text; });
 }
 
-function speak(text) {
+function pickVoice(lang) {
+  const voices = window.speechSynthesis.getVoices();
+  if (!voices.length) return null;
+  const localeMatch = voices.filter(v => v.lang && v.lang.toLowerCase().startsWith(lang.slice(0, 2)));
+  const pool = localeMatch.length ? localeMatch : voices;
+  const warm = pool.find(v => /female|samantha|jenny|aria|libby|zira/i.test(v.name));
+  return warm || pool[0];
+}
+
+// warmth: undefined = brisk nav-cue voice, "calm" = slower, gentler,
+// storybook-style narration (mirrors the soft narrated tone from the
+// Little Lantern storybook project)
+function speak(text, warmth) {
   if (!("speechSynthesis" in window)) return;
   const utter = new SpeechSynthesisUtterance(text);
-  utter.rate = 0.95;
-  utter.lang = AppState.isArabic ? "ar-AE" : "en-US";
+  const lang = AppState.isArabic ? "ar-AE" : "en-US";
+  utter.lang = lang;
+  const voice = pickVoice(lang);
+  if (voice) utter.voice = voice;
+  if (warmth === "calm") { utter.rate = 0.82; utter.pitch = 1.05; }
+  else { utter.rate = 0.95; utter.pitch = 1.0; }
   window.speechSynthesis.cancel();
   window.speechSynthesis.speak(utter);
 }
+// Chrome loads voices asynchronously; warm the list so pickVoice has data.
+if ("speechSynthesis" in window) { window.speechSynthesis.onvoiceschanged = () => {}; window.speechSynthesis.getVoices(); }
 
 function goToScreen(name, opts = {}) {
+  if (name !== "journey" && window.ClearPathMap) window.ClearPathMap.stopWalkthrough();
+  if (name !== "story" && window.Sensory) Sensory.ambientStop();
   const screens = document.querySelectorAll(".screen");
   screens.forEach(s => s.classList.toggle("active", s.id === "screen-" + name));
   document.querySelectorAll("#tabbar button").forEach(b => {
@@ -131,6 +151,8 @@ document.addEventListener("DOMContentLoaded", () => {
       speak("Audio-first mode off.");
     }
   });
+
+  document.getElementById("mapWalkBtn").addEventListener("click", () => window.ClearPathMap.startWalkthrough());
 
   renderStageList();
   populateReportStageSelect();

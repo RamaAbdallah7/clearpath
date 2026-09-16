@@ -322,6 +322,26 @@ main p, main li, main label, main td, main th { font-size: var(--step-body); }
 
 #map { height: 320px; border-radius: var(--radius); border: 1px solid var(--border); }
 
+.walker-dot {
+  width: 20px; height: 20px;
+  border-radius: 50%;
+  background: var(--focus);
+  border: 3px solid #06140d;
+  box-shadow: 0 0 0 0 rgba(255,212,0,0.5);
+  animation: walkerPulse 1.4s infinite;
+}
+@keyframes walkerPulse {
+  0% { box-shadow: 0 0 0 0 rgba(255,212,0,0.5); }
+  70% { box-shadow: 0 0 0 12px rgba(255,212,0,0); }
+  100% { box-shadow: 0 0 0 0 rgba(255,212,0,0); }
+}
+.leaflet-tooltip {
+  background: var(--surface-raised);
+  color: var(--text);
+  border: 1px solid var(--accent);
+  font-weight: 700;
+}
+
 .mode-badge {
   font-size: 0.75rem;
   padding: 4px 10px;
@@ -520,7 +540,6 @@ video.headcam-preview {
   color: #7fe6ff;
   font-family: monospace;
   background: linear-gradient(180deg, rgba(4,20,24,0.75), transparent);
-  text-shadow: 0 0 6px rgba(127,230,255,0.6);
 }
 .ar-wrap.glass-hud::before {
   content: "";
@@ -540,6 +559,33 @@ video.headcam-preview {
   font-size: 0.7rem;
   letter-spacing: 0.12em;
   pointer-events: none;
+}
+
+.story3d-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  background: #05100b;
+}
+.story3d-overlay canvas { width: 100%; height: 100%; display: block; touch-action: none; cursor: grab; }
+.story3d-hint {
+  position: absolute;
+  top: 16px; left: 50%;
+  transform: translateX(-50%);
+  color: #fff;
+  background: rgba(0,0,0,0.5);
+  padding: 8px 16px;
+  border-radius: 999px;
+  font-size: 0.9rem;
+  transition: opacity 0.4s;
+  pointer-events: none;
+}
+.story3d-controls {
+  position: absolute;
+  bottom: 18px; left: 0; right: 0;
+  display: flex;
+  justify-content: center;
+  gap: 12px;
 }
 
 .headcam-dot {
