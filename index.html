@@ -16,6 +16,15 @@
 <div aria-live="polite" class="visually-hidden" id="announcer"></div>
 <div id="toastRegion" class="toast-region" aria-live="polite"></div>
 
+<!-- Always-visible captions for every spoken cue — a Deaf/Hard-of-Hearing
+     visitor gets nothing from speech synthesis otherwise. Grounded in
+     Focus Area 4 (Communication & Social Inclusion): "466M people have
+     disabling hearing loss." -->
+<div id="captionBar" class="caption-bar" aria-live="polite" hidden>
+  <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M6 10h3M6 14h6M13 10h5M15 14h3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+  <span id="captionText"></span>
+</div>
+
 <!-- Virtual hands-free cursor: a real on-screen pointer driven by head position,
      not a focus-cycler. See js/headcontrol.js -->
 <div id="headCursor" class="head-cursor" hidden>
@@ -47,13 +56,33 @@
   <!-- HOME -->
   <section class="screen active" id="screen-home" aria-labelledby="home-h">
     <div class="hero" style="background-image:linear-gradient(180deg, rgba(11,30,20,0.15), rgba(8,20,14,0.86)), url('assets/photos/001-thumb.jpg')">
-      <span class="badge">Focus Area 2 &middot; Vision &amp; Sensory Technology</span>
+      <span class="badge">Challenge 1 &middot; Al Jahili Park</span>
       <h2 id="home-h">Independent arrival, from parking to Al Jahili Park</h2>
-      <p>A guided, hands-free route from the car park to the entrance and internal paths — with AR
-        directions, a proximity sound beacon, haptic pulses, voice and head control, and a calm
-        pre-visit story for children.</p>
-      <div class="row">
-        <button class="btn primary" data-goto="ar" type="button">Start AR navigation</button>
+      <p>Built for Focus Area 2 (Vision &amp; Sensory Technology) of the KU &times; ZA Inclusion
+        Innovation Hackathon.</p>
+    </div>
+
+    <div class="card problem-card">
+      <h2>The problem</h2>
+      <p><em>"Can a Person of Determination move independently from parking areas to the park entrance
+        and internal pathways without obstacles, gaps in accessibility, or unclear directions?"</em>
+        — the challenge brief, verbatim.</p>
+      <p style="color:var(--muted)">Right now: nothing tells a visitor, before or during the walk,
+        which parts of the route are step-free, shaded, or safe — or confirms they're going the right
+        way. Confidence breaks down before the visit even starts.</p>
+    </div>
+
+    <div class="card">
+      <h2>How ClearPath addresses it</h2>
+      <ul class="solution-list">
+        <li><strong>Unclear directions</strong> &rarr; a live simulated trip and AR arrow show exactly where to go, stage by stage.</li>
+        <li><strong>Can't tell what's ahead</strong> &rarr; the journey map scores every stage for step-free access, shade, and rest points before you commit.</li>
+        <li><strong>Needs to look at a screen to navigate</strong> &rarr; a proximity sound beacon, haptic pulses, and voice control mean you never have to.</li>
+        <li><strong>Anxiety about the unfamiliar</strong> &rarr; a narrated, mood-aware pre-visit story prepares a child before arrival.</li>
+        <li><strong>No way to flag what's actually broken</strong> &rarr; barrier reports export straight into a municipality-ready checklist.</li>
+      </ul>
+      <div class="row" style="margin-top:14px;">
+        <button class="btn primary" data-goto="ar" type="button">See the simulated trip</button>
         <button class="btn ghost" data-goto="journey" type="button">See journey map</button>
       </div>
     </div>
@@ -72,8 +101,8 @@
       </button>
       <button class="feature-card" data-goto="ar" type="button">
         <svg viewBox="0 0 24 24" width="26" height="26"><rect x="3" y="6" width="18" height="13" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="12" cy="12.5" r="3.4" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M8 6l1.4-2h5.2L16 6" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
-        <span>AR Navigate</span>
-        <p>Live camera arrow pointing to the next stage</p>
+        <span>AR &amp; Simulated Trip</span>
+        <p>Watch the journey happen, or navigate it live</p>
       </button>
       <button class="feature-card" data-goto="access" type="button">
         <svg viewBox="0 0 24 24" width="26" height="26"><circle cx="12" cy="6" r="3" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M5 21c0-4 3-6 7-6s7 2 7 6" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
@@ -87,8 +116,8 @@
       </button>
       <button class="feature-card" data-goto="report" type="button">
         <svg viewBox="0 0 24 24" width="26" height="26"><rect x="5" y="3" width="14" height="18" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M9 8h6M9 12h6M9 16h3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
-        <span>Report &amp; Checklist</span>
-        <p>Flag a barrier, export for the municipality</p>
+        <span>Report &amp; Communicate</span>
+        <p>Flag a barrier, or use the quick phrase board</p>
       </button>
       <button class="feature-card" data-goto="profile" type="button">
         <svg viewBox="0 0 24 24" width="26" height="26"><circle cx="12" cy="8" r="4" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M4 20c1-4 4.5-6 8-6s7 2 8 6" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
@@ -206,13 +235,14 @@
         <h2 id="ar-h" style="margin-bottom:4px;">AR navigate</h2>
         <span class="mode-badge" id="arModeBadge">Idle</span>
       </div>
-      <p>Three ways to run it: <strong>Live</strong> uses real GPS + compass at the park. <strong>Classroom
-        demo</strong> uses your device's real camera and real compass right now — turn around and watch
-        the arrow track a simulated target live. <strong>Auto-demo</strong> needs no sensors at all.</p>
+      <p><strong>Simulated Trip</strong> plays the real journey as a narrated cinematic sequence through
+        the actual site photos — no camera or sensors, works anywhere, this is what "arrival at Al
+        Jahili Park" looks like. <strong>Classroom demo</strong> uses your device's real camera and
+        compass right now. <strong>Live</strong> uses real GPS + compass at the park itself.</p>
       <div class="row">
-        <button class="btn primary" id="arStart" type="button">Live (GPS)</button>
-        <button class="btn primary" id="arClassroom" type="button">🎓 Classroom demo</button>
-        <button class="btn ghost" id="arDemo" type="button">▶ Auto-demo</button>
+        <button class="btn primary" id="arDemo" type="button">🎬 Play Simulated Trip</button>
+        <button class="btn secondary" id="arClassroom" type="button">🎓 Classroom demo</button>
+        <button class="btn secondary" id="arStart" type="button">Live (GPS)</button>
         <button class="btn secondary" id="arStop" type="button" disabled>Stop</button>
       </div>
 
@@ -229,6 +259,8 @@
 
       <div class="ar-wrap" id="arWrap" style="margin-top:14px;">
         <video id="arVideo" autoplay playsinline muted></video>
+        <img class="ar-trip-photo" id="arTripPhotoA" alt="" hidden>
+        <img class="ar-trip-photo" id="arTripPhotoB" alt="" hidden>
         <div class="ar-hud-top">
           <span id="arStatus">Camera not started</span>
           <span id="arDistance">—</span>
@@ -237,7 +269,7 @@
           <polygon points="50,6 80,62 58,62 58,94 42,94 42,62 20,62" fill="#ffd400" stroke="#0a1f16" stroke-width="4"/>
         </svg>
         <div class="ar-progress" id="arProgress"></div>
-        <div class="ar-banner" id="arBanner">Choose Live, Classroom demo, or Auto-demo to begin.</div>
+        <div class="ar-banner" id="arBanner">Play the Simulated Trip, try Classroom demo, or go Live at the park.</div>
         <button class="btn primary ar-next-stage" id="arClassroomNext" type="button" hidden>Advance to next stage &rarr;</button>
       </div>
 
@@ -294,6 +326,23 @@
 
   <!-- REPORT & CHECKLIST -->
   <section class="screen" id="screen-report" aria-labelledby="report-h">
+    <div class="card">
+      <h2>Quick communication board</h2>
+      <p style="color:var(--muted)">Tap a phrase — it's spoken aloud and shown large on screen, for a
+        visitor who can't or doesn't want to speak. Grounded in Focus Area 3 (Cognitive &amp; Learning
+        Support: "Communication Aids — AAC devices, symbol-based communication") and Focus Area 4
+        (Communication &amp; Social Inclusion).</p>
+      <div class="aac-grid" id="aacGrid">
+        <button class="aac-tile" data-phrase="I need to rest" type="button"><span aria-hidden="true">🪑</span>I need to rest</button>
+        <button class="aac-tile" data-phrase="It's too loud or too bright" type="button"><span aria-hidden="true">🔆</span>Too loud / bright</button>
+        <button class="aac-tile" data-phrase="Where is the toilet" type="button"><span aria-hidden="true">🚻</span>Where's the toilet?</button>
+        <button class="aac-tile" data-phrase="I need help please" type="button"><span aria-hidden="true">🆘</span>I need help</button>
+        <button class="aac-tile" data-phrase="I feel scared" type="button"><span aria-hidden="true">💛</span>I feel scared</button>
+        <button class="aac-tile" data-phrase="I'm ready to continue" type="button"><span aria-hidden="true">✅</span>Ready to continue</button>
+      </div>
+      <div id="aacSpoken" class="aac-spoken" aria-live="polite"></div>
+    </div>
+
     <div class="card">
       <h2 id="report-h">Report a barrier</h2>
       <label for="reportStage">Where?</label>

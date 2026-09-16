@@ -3,12 +3,12 @@
   let watchId = null;
   let currentPos = null;
   let currentHeading = null;
-  let mode = "idle"; // idle | live | demo | classroom
-  let demoT = 0; // 0..1 progress across the whole route
+  let mode = "idle"; // idle | live | classroom | trip
   let lastAnnouncedStage = -1;
   let tickHandle = null;
   let manualHeading = null;
   let orientationSupported = false;
+  let tripCancelled = true;
 
   const video = document.getElementById("arVideo");
   const arrow = document.getElementById("arArrow");
@@ -18,12 +18,14 @@
   const badge = document.getElementById("arModeBadge");
   const progress = document.getElementById("arProgress");
   const startBtn = document.getElementById("arStart");
-  const demoBtn = document.getElementById("arDemo");
+  const tripBtn = document.getElementById("arDemo");
   const classroomBtn = document.getElementById("arClassroom");
   const classroomNextBtn = document.getElementById("arClassroomNext");
   const stopBtn = document.getElementById("arStop");
   const simSlider = document.getElementById("simBearing");
   const glassToggle = document.getElementById("glassHudToggle");
+  const photoA = document.getElementById("arTripPhotoA");
+  const photoB = document.getElementById("arTripPhotoB");
 
   // Simulated compass bearings for each stage, used only in Classroom Demo
   // mode where there's no real GPS to compute a real bearing from. Spread
@@ -50,8 +52,6 @@
     return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   }
 
-  function lerp(a, b, t) { return a + (b - a) * t; }
-
   function currentTarget() {
     return JOURNEY[Math.min(AppState.currentStageIndex, JOURNEY.length - 1)];
   }
@@ -68,17 +68,6 @@
   function setBadge(text, cls) {
     badge.textContent = text;
     badge.className = "mode-badge" + (cls ? " " + cls : "");
-  }
-
-  function demoPosition() {
-    const startPos = { lat: JOURNEY[0].lat - 0.0004, lng: JOURNEY[0].lng - 0.00035 };
-    const points = [startPos, ...JOURNEY.map(s => ({ lat: s.lat, lng: s.lng }))];
-    const segCount = points.length - 1;
-    const scaled = demoT * segCount;
-    const segIdx = Math.min(Math.floor(scaled), segCount - 1);
-    const segT = scaled - segIdx;
-    const a = points[segIdx], b = points[segIdx + 1];
-    return { lat: lerp(a.lat, b.lat, segT), lng: lerp(a.lng, b.lng, segT) };
   }
 
   function advanceStage(finalMessage) {
@@ -100,12 +89,7 @@
     const target = currentTarget();
     let pos, heading, bearing, dist;
 
-    if (mode === "demo") {
-      pos = demoPosition();
-      bearing = bearingTo(pos, { lat: target.lat, lng: target.lng });
-      heading = bearing; // demo camera is conceptually always facing the route
-      dist = Math.round(distanceMeters(pos, { lat: target.lat, lng: target.lng }));
-    } else if (mode === "live") {
+    if (mode === "live") {
       pos = currentPos || { lat: JOURNEY[0].lat - 0.0006, lng: JOURNEY[0].lng - 0.0005 };
       heading = manualHeading != null ? manualHeading : (currentHeading ?? 0);
       bearing = bearingTo(pos, { lat: target.lat, lng: target.lng });
@@ -122,12 +106,14 @@
     arrow.style.transform = `rotate(${relative}deg)`;
     banner.textContent = `Stage ${target.stage}/${JOURNEY.length}: ${target.title} — ${target.cue}`;
 
-    if (mode === "demo") {
-      distanceEl.textContent = `${dist} m ahead`;
-      status.textContent = `Auto-demo · heading ${Math.round(heading)}°`;
-    } else if (mode === "live") {
+    if (mode === "live") {
       distanceEl.textContent = `${dist} m ahead`;
       status.textContent = currentPos ? `GPS locked · heading ${Math.round(heading)}°` : "Waiting for GPS — use manual heading below";
+      if (AppState.settings.beacon) Sensory.beaconSetDistance(dist);
+      if (dist < 15 && lastAnnouncedStage !== AppState.currentStageIndex) {
+        lastAnnouncedStage = AppState.currentStageIndex;
+        advanceStage(null);
+      }
     } else if (mode === "classroom") {
       const off = Math.round(Math.min(relative, 360 - relative));
       distanceEl.textContent = off < 15 ? "Facing it!" : `${off}° to turn`;
@@ -135,18 +121,11 @@
         ? `Classroom demo · real compass ${Math.round(heading)}°`
         : "No compass detected · drag manual heading below";
     }
-
-    if (mode !== "classroom" && AppState.settings.beacon) Sensory.beaconSetDistance(dist);
-
-    if ((mode === "demo" || mode === "live") && dist < 15 && lastAnnouncedStage !== AppState.currentStageIndex) {
-      lastAnnouncedStage = AppState.currentStageIndex;
-      advanceStage(mode === "demo" ? () => { speak("Demo complete. You've arrived at the park."); stopDemo(); } : null);
-    }
   }
 
   function loop() {
     update();
-    if (mode !== "idle") tickHandle = requestAnimationFrame(loop);
+    if (mode === "live" || mode === "classroom") tickHandle = requestAnimationFrame(loop);
   }
 
   function onOrientation(e) {
@@ -176,7 +155,7 @@
         video.srcObject = stream;
         return true;
       } catch (err2) {
-        status.textContent = "Camera unavailable — try auto-demo instead.";
+        status.textContent = "Camera unavailable — try the Simulated Trip instead.";
         return false;
       }
     }
@@ -184,6 +163,7 @@
 
   async function startLive() {
     stopAll(true);
+    video.hidden = false;
     await startCamera("environment");
     await requestOrientation();
 
@@ -197,7 +177,7 @@
 
     mode = "live";
     setBadge("Live", "live");
-    setButtons({ start: true, classroom: true, demo: true, stop: false });
+    setButtons({ start: true, classroom: true, trip: true, stop: false });
     renderProgress();
     speak(`Starting navigation. ${currentTarget().cue}`);
     loop();
@@ -207,12 +187,13 @@
     stopAll(true);
     AppState.currentStageIndex = 0;
     lastAnnouncedStage = -1;
+    video.hidden = false;
     await startCamera("environment");
     await requestOrientation();
 
     mode = "classroom";
     setBadge("Classroom", "classroom");
-    setButtons({ start: true, classroom: true, demo: true, stop: false });
+    setButtons({ start: true, classroom: true, trip: true, stop: false });
     classroomNextBtn.hidden = false;
     renderStageList();
     renderProgress();
@@ -220,27 +201,70 @@
     loop();
   }
 
-  function startDemo() {
+  function tripSleep(ms) {
+    return new Promise((resolve) => {
+      const start = performance.now();
+      function check() {
+        if (tripCancelled || performance.now() - start >= ms) return resolve();
+        requestAnimationFrame(check);
+      }
+      check();
+    });
+  }
+
+  // Simulated Trip: a narrated cinematic sequence through the real site
+  // photos (Ken Burns pan/zoom, crossfade), not a live arrow overlay.
+  // Needs no camera/GPS/compass, so it always looks the same and always
+  // works, indoors or out — the reliable "what it will look like" demo.
+  async function startTrip() {
     stopAll(true);
+    tripCancelled = false;
     AppState.currentStageIndex = 0;
-    lastAnnouncedStage = -1;
-    demoT = 0;
-    mode = "demo";
-    setBadge("Auto-demo", "demo");
-    setButtons({ start: true, classroom: true, demo: true, stop: false });
+    video.hidden = true;
+    mode = "trip";
+    setBadge("Simulated Trip", "demo");
+    setButtons({ start: true, classroom: true, trip: true, stop: false });
+    status.textContent = "Simulated Trip · narrated walkthrough";
+    arrow.style.transform = "rotate(0deg)";
     renderStageList();
     renderProgress();
-    speak("Running the auto-demo walkthrough.");
+    speak("Here's what the trip from parking to Al Jahili Park looks like.");
+    await tripSleep(1400);
 
-    const durationMs = 16000;
-    const t0 = performance.now();
-    function step(now) {
-      if (mode !== "demo") return;
-      demoT = Math.min((now - t0) / durationMs, 1);
-      update();
-      if (demoT < 1) tickHandle = requestAnimationFrame(step);
+    let useA = true;
+    for (let i = 0; i < JOURNEY.length && !tripCancelled; i++) {
+      const stage = JOURNEY[i];
+      AppState.currentStageIndex = i;
+      renderStageList();
+      renderProgress();
+
+      const showEl = useA ? photoA : photoB;
+      const hideEl = useA ? photoB : photoA;
+      useA = !useA;
+
+      showEl.src = stage.photo;
+      showEl.classList.remove("kb-a", "kb-b");
+      void showEl.offsetWidth; // restart CSS animation
+      showEl.classList.add(i % 2 === 0 ? "kb-a" : "kb-b");
+      showEl.hidden = false;
+      requestAnimationFrame(() => showEl.classList.add("visible"));
+      hideEl.classList.remove("visible");
+
+      distanceEl.textContent = `${stage.stage} of ${JOURNEY.length}`;
+      banner.textContent = `Stage ${stage.stage}/${JOURNEY.length}: ${stage.title} — ${stage.cue}`;
+      speak(stage.cue);
+      if (i > 0) { Sensory.earcon("stage"); if (AppState.settings.haptics) Sensory.vibrate([60, 30, 60]); }
+
+      await tripSleep(4200);
     }
-    tickHandle = requestAnimationFrame(step);
+
+    if (!tripCancelled) {
+      Sensory.earcon("arrive");
+      if (AppState.settings.haptics) Sensory.vibrate([100, 60, 100, 60, 180]);
+      speak("That's the full trip — from parking, all the way to the park.");
+      await tripSleep(2200);
+    }
+    stopAll();
   }
 
   function classroomAdvance() {
@@ -262,27 +286,28 @@
   function stopAll(silent) {
     stopSensors();
     cancelAnimationFrame(tickHandle);
+    tripCancelled = true;
     mode = "idle";
     if (!silent) resetUI();
   }
-  // kept for the earlier per-mode call sites
-  function stopLive(silent) { stopAll(silent); }
-  function stopDemo(silent) { stopAll(silent); }
 
-  function setButtons({ start, classroom, demo, stop }) {
+  function setButtons({ start, classroom, trip, stop }) {
     startBtn.disabled = start;
     classroomBtn.disabled = classroom;
-    demoBtn.disabled = demo;
+    tripBtn.disabled = trip;
     stopBtn.disabled = stop;
   }
 
   function resetUI() {
     setBadge("Idle");
-    setButtons({ start: false, classroom: false, demo: false, stop: true });
+    setButtons({ start: false, classroom: false, trip: false, stop: true });
     classroomNextBtn.hidden = true;
+    video.hidden = false;
+    photoA.hidden = true; photoA.classList.remove("visible");
+    photoB.hidden = true; photoB.classList.remove("visible");
     status.textContent = "Camera not started";
     distanceEl.textContent = "—";
-    banner.textContent = "Choose Live, Classroom demo, or Auto-demo to begin.";
+    banner.textContent = "Play the Simulated Trip, try Classroom demo, or go Live at the park.";
     arrow.style.transform = "rotate(0deg)";
   }
 
@@ -298,10 +323,10 @@
 
   startBtn.addEventListener("click", startLive);
   classroomBtn.addEventListener("click", startClassroom);
-  demoBtn.addEventListener("click", startDemo);
+  tripBtn.addEventListener("click", startTrip);
   classroomNextBtn.addEventListener("click", classroomAdvance);
   stopBtn.addEventListener("click", () => stopAll());
 
   renderProgress();
-  window.ClearPathAR = { startLive, startDemo, startClassroom, stop: () => stopAll() };
+  window.ClearPathAR = { startLive, startDemo: startTrip, startTrip, startClassroom, stop: () => stopAll() };
 })();

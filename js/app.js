@@ -23,10 +23,22 @@ function pickVoice(lang) {
   return warm || pool[0];
 }
 
+let captionTimer = null;
+function showCaption(text) {
+  const bar = document.getElementById("captionBar");
+  const label = document.getElementById("captionText");
+  if (!bar || !text) return;
+  label.textContent = text;
+  bar.hidden = false;
+  clearTimeout(captionTimer);
+  captionTimer = setTimeout(() => { bar.hidden = true; }, Math.max(2500, text.length * 90));
+}
+
 // warmth: undefined = brisk nav-cue voice, "calm" = slower, gentler,
 // storybook-style narration (mirrors the soft narrated tone from the
 // Little Lantern storybook project)
 function speak(text, warmth) {
+  showCaption(text);
   if (!("speechSynthesis" in window)) return;
   const utter = new SpeechSynthesisUtterance(text);
   const lang = AppState.isArabic ? "ar-AE" : "en-US";
@@ -153,6 +165,16 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   document.getElementById("mapWalkBtn").addEventListener("click", () => window.ClearPathMap.startWalkthrough());
+
+  document.querySelectorAll(".aac-tile").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const phrase = btn.dataset.phrase;
+      document.getElementById("aacSpoken").textContent = phrase;
+      speak(phrase, "calm");
+      Sensory.earcon("toggle");
+      if (AppState.settings.haptics) Sensory.vibrate(30);
+    });
+  });
 
   renderStageList();
   populateReportStageSelect();
