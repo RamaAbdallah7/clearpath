@@ -200,6 +200,14 @@
   }
 
   document.addEventListener("DOMContentLoaded", () => {
+    // Start the guided tour from whichever viewpoint is currently selected,
+    // so "walk the park" continues from where the visitor was reading.
+    document.getElementById("startVrTour").addEventListener("click", () => {
+      window.ClearPathStory3D.openTour(PARK_VIEWPOINTS, current);
+    });
+    document.getElementById("story3dNext").addEventListener("click", () => ClearPathStory3D.nextStop());
+    document.getElementById("story3dPrev").addEventListener("click", () => ClearPathStory3D.prevStop());
+    document.getElementById("story3dReplay").addEventListener("click", () => ClearPathStory3D.replay());
     render();
     window.addEventListener("clearpath:language", render);
   });

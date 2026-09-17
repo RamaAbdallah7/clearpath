@@ -342,7 +342,98 @@
     if (walker) walker.closeTooltip();
   }
 
+  /* ── Route preferences ──
+     The needs picker drives which route is recommended, and the result
+     explains which attributes decided it. A recommendation you cannot
+     interrogate is one you cannot disagree with. */
+  const chosenNeeds = new Set();
+  let prefLine = null;
+
+  function renderNeeds() {
+    const grid = document.getElementById("needsGrid");
+    if (!grid) return;
+    grid.innerHTML = "";
+    for (const [key, need] of Object.entries(ClearPathRoutePrefs.NEEDS)) {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "need-chip" + (chosenNeeds.has(key) ? " active" : "");
+      b.setAttribute("aria-pressed", String(chosenNeeds.has(key)));
+      b.textContent = need.label[I18n.lang()] || need.label.en;
+      b.addEventListener("click", () => {
+        chosenNeeds.has(key) ? chosenNeeds.delete(key) : chosenNeeds.add(key);
+        // Keep the shared profile in step so the map markers and AR cues
+        // reflect the same choices.
+        if (key === "mobility" || key === "vision" || key === "heat" || key === "quiet") {
+          chosenNeeds.has(key) ? AppState.profile.add(key) : AppState.profile.delete(key);
+        }
+        renderNeeds();
+      });
+      grid.appendChild(b);
+    }
+  }
+
+  function showChoice(choice) {
+    if (!map) return;
+    if (prefLine) map.removeLayer(prefLine);
+    if (!choice.route) { toast(I18n.t("assist.offline")); return; }
+    prefLine = L.polyline(choice.route.shape, { color: "#6354B4", weight: 7, opacity: 0.95 }).addTo(map);
+    fittedBounds = prefLine.getBounds();
+    fitRoute();
+    speak(`${I18n.t("needs.best")}: ${choice.name[I18n.lang()] || choice.name.en}. ${choice.why[I18n.lang()] || choice.why.en}`);
+  }
+
+  async function findBestRoute() {
+    const box = document.getElementById("routeChoices");
+    const btn = document.getElementById("findBestRoute");
+    btn.disabled = true;
+    box.innerHTML = `<p class="needs-working">${I18n.t("needs.working")}</p>`;
+    try {
+      const { ranked } = await ClearPathRoutePrefs.rank(chosenNeeds);
+      box.innerHTML = "";
+      ranked.forEach((c, i) => {
+        const el = document.createElement("div");
+        el.className = "route-choice" + (i === 0 ? " best" : "");
+        const name = c.name[I18n.lang()] || c.name.en;
+        const why = c.why[I18n.lang()] || c.why.en;
+        const reasons = c.reasons.map(r =>
+          `<span class="reason ${r.good ? "good" : "bad"}">${r.good ? "✓" : "!"} ${r.text}</span>`).join("");
+        el.innerHTML =
+          `<div class="route-choice-head">
+             <span class="route-rank">${i === 0 ? I18n.t("needs.best") : I18n.t("needs.alt")}</span>
+             <span class="route-score">${c.score}<small>/100</small></span>
+           </div>
+           <strong>${name}</strong>
+           <p>${why}</p>
+           <div class="reasons">${reasons}</div>
+           <p class="route-facts">${c.attrs.metres != null ? c.attrs.metres + " m · " + Math.round(c.route.duration / 60) + " min" : ""}
+             ${c.profileUsed === "wheelchair" ? " · wheelchair profile" : ""}</p>
+           <button class="btn secondary small" type="button">${I18n.t("needs.show")}</button>`;
+        el.querySelector("button").addEventListener("click", () => showChoice(c));
+        box.appendChild(el);
+      });
+      // Draw the winner straight away — the point is to be guided, not to
+      // be handed a list and left to choose.
+      if (ranked[0]) showChoice(ranked[0]);
+      draw();
+    } catch (e) {
+      console.warn("[map] ranking failed", e);
+      box.innerHTML = `<p class="needs-working">${I18n.t("assist.offline")}</p>`;
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
   document.addEventListener("DOMContentLoaded", () => {
+    renderNeeds();
+    window.addEventListener("clearpath:language", renderNeeds);
+    document.getElementById("findBestRoute").addEventListener("click", findBestRoute);
+    document.getElementById("clearNeeds").addEventListener("click", () => {
+      chosenNeeds.clear();
+      ["mobility","vision","heat","quiet"].forEach(k => AppState.profile.delete(k));
+      renderNeeds();
+      document.getElementById("routeChoices").innerHTML = "";
+      if (prefLine) { map && map.removeLayer(prefLine); prefLine = null; }
+    });
     document.getElementById("mapLocateBtn").addEventListener("click", locateMe);
     document.getElementById("placesRefresh").addEventListener("click", () => {
       ClearPathPlaces.clearCache();

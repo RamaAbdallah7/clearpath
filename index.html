@@ -7,7 +7,7 @@
 <meta name="description" content="Hands-free, AR-guided arrival journey for Al Jahili Park — built for the KU x ZA Inclusion Innovation Hackathon, Challenge 1.">
 <meta name="theme-color" content="#0f1a14">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='6' fill='%232fbf87'/%3E%3Cpath d='M12 4 4 8l8 4 8-4-8-4Z' fill='%2306140d'/%3E%3Cpath d='M4 12l8 4 8-4' fill='none' stroke='%2306140d' stroke-width='1.6'/%3E%3C/svg%3E">
-<link rel="stylesheet" href="css/style.css?v=20260917075305">
+<link rel="stylesheet" href="css/style.css?v=20260917092531">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body data-contrast="normal">
@@ -265,6 +265,19 @@
       </div>
       <p style="color:var(--muted)">See the whole arrival journey play out on the real map — no camera
         or sensors needed, works anywhere.</p>
+      <!-- Route preferences. These used to only flag stages; they now decide
+           which route is recommended, and the recommendation explains itself. -->
+      <div class="needs-panel">
+        <h3 data-i18n="needs.h"></h3>
+        <p data-i18n="needs.sub"></p>
+        <div class="needs-grid" id="needsGrid" role="group"></div>
+        <div class="row" style="margin-top:12px;">
+          <button class="btn primary" id="findBestRoute" type="button" data-i18n="needs.cta"></button>
+          <button class="btn secondary" id="clearNeeds" type="button" data-i18n="needs.clear"></button>
+        </div>
+        <div id="routeChoices" class="route-choices" aria-live="polite"></div>
+      </div>
+
       <div class="row">
         <button class="btn primary" id="mapWalkBtn" type="button">▶ Play walkthrough</button>
         <button class="btn secondary" id="mapLocateBtn" type="button">📍 Route from where I am</button>
@@ -409,6 +422,11 @@
       </div>
       <p style="color:var(--muted)" data-i18n="visit.intro"></p>
 
+      <div class="row" style="margin-top:14px;">
+        <button class="btn primary" id="startVrTour" type="button" data-i18n="vr.cta"></button>
+        <span class="vr-note" id="vrNote" data-i18n="vr.note"></span>
+      </div>
+
       <div class="sv-list" id="svList" role="group" aria-label="Viewpoints"></div>
       <div class="sv-stage" id="svStage"></div>
     </div>
@@ -465,6 +483,14 @@
   <div id="story3dOverlay" class="story3d-overlay" hidden>
     <canvas id="story3dCanvas"></canvas>
     <div class="story3d-hint" id="story3dHint">Drag to look around</div>
+    <!-- Tour label and transport, shown only when the viewer is running a
+         guided tour rather than a single photo. -->
+    <div class="story3d-label" id="story3dLabel" aria-live="polite"></div>
+    <div class="story3d-controls" id="story3dTourBar" hidden>
+      <button class="btn secondary" id="story3dPrev" type="button" data-i18n="vr.prev"></button>
+      <button class="btn secondary" id="story3dReplay" type="button" data-i18n="vr.replay"></button>
+      <button class="btn primary" id="story3dNext" type="button" data-i18n="vr.next"></button>
+    </div>
     <div class="story3d-controls">
       <button class="btn secondary" id="story3dClose" type="button">Close</button>
       <button class="btn primary" id="story3dVR" type="button" hidden>Enter VR</button>
@@ -593,37 +619,38 @@
 </nav>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="js/apibase.js?v=20260917075305"></script>
-<script src="js/gemini.js?v=20260917075305"></script>
-<script src="js/i18n.js?v=20260917075305"></script>
-<script src="js/toast.js?v=20260917075305"></script>
-<script src="js/sensory.js?v=20260917075305"></script>
-<script src="js/journey-data.js?v=20260917075305"></script>
-<script src="js/storybook-data.js?v=20260917075305"></script>
-<script src="js/parkview-data.js?v=20260917075305"></script>
+<script src="js/apibase.js?v=20260917092531"></script>
+<script src="js/gemini.js?v=20260917092531"></script>
+<script src="js/i18n.js?v=20260917092531"></script>
+<script src="js/toast.js?v=20260917092531"></script>
+<script src="js/sensory.js?v=20260917092531"></script>
+<script src="js/journey-data.js?v=20260917092531"></script>
+<script src="js/storybook-data.js?v=20260917092531"></script>
+<script src="js/parkview-data.js?v=20260917092531"></script>
 <!-- geo.js owns every position fix; routing.js and places.js both use its
      distance helpers, so it has to load before them. -->
-<script src="js/geo.js?v=20260917075305"></script>
-<script src="js/routing.js?v=20260917075305"></script>
-<script src="js/places.js?v=20260917075305"></script>
-<script src="js/ai.js?v=20260917075305"></script>
-<script src="js/app.js?v=20260917075305"></script>
-<script src="js/map.js?v=20260917075305"></script>
-<script src="js/ar.js?v=20260917075305"></script>
-<script src="js/arpath.js?v=20260917075305"></script>
-<script src="js/streetview.js?v=20260917075305"></script>
-<script src="js/assist.js?v=20260917075305"></script>
-<script src="js/screenreader.js?v=20260917075305"></script>
+<script src="js/geo.js?v=20260917092531"></script>
+<script src="js/routing.js?v=20260917092531"></script>
+<script src="js/routeprefs.js?v=20260917092531"></script>
+<script src="js/places.js?v=20260917092531"></script>
+<script src="js/ai.js?v=20260917092531"></script>
+<script src="js/app.js?v=20260917092531"></script>
+<script src="js/map.js?v=20260917092531"></script>
+<script src="js/ar.js?v=20260917092531"></script>
+<script src="js/arpath.js?v=20260917092531"></script>
+<script src="js/streetview.js?v=20260917092531"></script>
+<script src="js/assist.js?v=20260917092531"></script>
+<script src="js/screenreader.js?v=20260917092531"></script>
 <!-- MediaPipe ships as ESM only, so this one is a module. It sets
      window.ClearPathVision when ready and the AR screen waits for it. -->
-<script type="module" src="js/vision.js?v=20260917075305"></script>
-<script src="js/voice.js?v=20260917075305"></script>
-<script src="js/storybook.js?v=20260917075305"></script>
-<script src="js/report.js?v=20260917075305"></script>
+<script type="module" src="js/vision.js?v=20260917092531"></script>
+<script src="js/voice.js?v=20260917092531"></script>
+<script src="js/storybook.js?v=20260917092531"></script>
+<script src="js/report.js?v=20260917092531"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script src="js/story3d.js?v=20260917075305"></script>
+<script src="js/story3d.js?v=20260917092531"></script>
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js"></script>
-<script src="js/headcontrol.js?v=20260917075305"></script>
+<script src="js/headcontrol.js?v=20260917092531"></script>
 </body>
 </html>

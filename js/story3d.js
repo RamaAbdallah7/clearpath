@@ -128,6 +128,11 @@
 
   function close() {
     overlay.hidden = true;
+    tour = null;
+    const bar = document.getElementById("story3dTourBar");
+    if (bar) bar.hidden = true;
+    window.removeEventListener("keydown", onTourKey);
+    if (window.speechSynthesis) window.speechSynthesis.cancel();
     if (xrSession) { xrSession.end(); xrSession = null; }
     if (renderer) { renderer.setAnimationLoop(null); renderer.dispose(); }
     if (rafId) cancelAnimationFrame(rafId);
@@ -140,5 +145,79 @@
   closeBtn.addEventListener("click", close);
   vrBtn.addEventListener("click", enterVR);
 
-  window.ClearPathStory3D = { open, close };
+  /* ── Guided VR tour ──
+     The viewer already put one photo on a curved arc with drag-to-look and
+     Enter VR. A pre-visit only works as preparation if it walks you through
+     the place in order, narrating as it goes — so this sequences the
+     verified viewpoints, speaks each one, and lets you step at your own
+     pace. On a headset it is the same tour in stereo; on a phone it is
+     drag-to-look; on a laptop it is arrow keys. */
+  let tour = null;
+  let tourIndex = 0;
+
+  function tourLabel() {
+    const el = document.getElementById("story3dLabel");
+    if (!el || !tour) return;
+    const v = tour[tourIndex];
+    el.innerHTML =
+      `<strong>${I18n.tx(v, "title")}</strong>` +
+      `<span>${tourIndex + 1} / ${tour.length}</span>` +
+      `<p>${I18n.tx(v, "blurb")}</p>`;
+  }
+
+  function narrate() {
+    const v = tour[tourIndex];
+    const services = (I18n.lang() === "ar" && v.ar && v.ar.services) ? v.ar.services : v.services;
+    speak([I18n.tx(v, "title"), I18n.tx(v, "blurb"),
+           (I18n.lang() === "ar" ? "الخدمات هنا: " : "Services here: ") + services.join(I18n.lang() === "ar" ? "، " : ", "),
+           I18n.tx(v, "good")].filter(Boolean).join(". "), "calm");
+  }
+
+  function showTourStop(i) {
+    if (!tour) return;
+    tourIndex = Math.max(0, Math.min(tour.length - 1, i));
+    const v = tour[tourIndex];
+    if (mesh && mesh.material) {
+      // Swap the texture rather than rebuilding the scene, so an active XR
+      // session is never interrupted between stops.
+      new THREE.TextureLoader().load(v.photo, (tex) => {
+        mesh.material.map = tex;
+        mesh.material.needsUpdate = true;
+      });
+    }
+    lon = 0; lat = 0; updateCamera();
+    tourLabel();
+    narrate();
+  }
+
+  function nextStop() { if (tour && tourIndex < tour.length - 1) showTourStop(tourIndex + 1); }
+  function prevStop() { if (tour && tourIndex > 0) showTourStop(tourIndex - 1); }
+
+  function onTourKey(e) {
+    if (overlay.hidden) return;
+    if (e.key === "ArrowRight") { e.preventDefault(); nextStop(); }
+    else if (e.key === "ArrowLeft") { e.preventDefault(); prevStop(); }
+    else if (e.key === "Escape") { e.preventDefault(); close(); }
+  }
+
+  function openTour(viewpoints, startIndex) {
+    tour = (viewpoints && viewpoints.length) ? viewpoints : PARK_VIEWPOINTS;
+    tourIndex = Math.max(0, Math.min(tour.length - 1, startIndex || 0));
+    open(tour[tourIndex]);
+    document.getElementById("story3dTourBar").hidden = false;
+    tourLabel();
+    // Let the viewer settle before speaking, so the narration does not
+    // start over a blank screen.
+    setTimeout(narrate, 600);
+    window.addEventListener("keydown", onTourKey);
+  }
+
+  // Repeat the current stop's narration without moving. Someone who missed
+  // a detail should not have to restart the tour to hear it again.
+  function replay() { if (tour) narrate(); }
+
+  window.ClearPathStory3D = {
+    open, close, openTour, nextStop, prevStop, replay,
+    get isTour() { return !!tour && !overlay.hidden; }
+  };
 })();

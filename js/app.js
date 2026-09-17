@@ -57,11 +57,24 @@ function goToScreen(name, opts = {}) {
   if (name !== "journey" && window.ClearPathMap) window.ClearPathMap.stopWalkthrough();
   if (name !== "story" && window.Sensory) Sensory.ambientStop();
   const screens = document.querySelectorAll(".screen");
+  // A screen that does not exist would otherwise deactivate everything and
+  // leave a blank page — which is exactly what a deep link to a
+  // JS-injected screen did before it had finished being built.
+  if (!document.getElementById("screen-" + name)) {
+    console.warn("[nav] no such screen:", name);
+    name = "home";
+  }
   screens.forEach(s => s.classList.toggle("active", s.id === "screen-" + name));
   document.querySelectorAll("#tabbar button").forEach(b => {
     b.setAttribute("aria-selected", b.dataset.screen === name ? "true" : "false");
   });
   AppState.screen = name;
+  // Deep link each screen. Makes any screen shareable and bookmarkable —
+  // and means "open the assist screen" is a link a carer can send someone,
+  // rather than a set of directions they have to follow.
+  if (location.hash.slice(1) !== name) {
+    try { history.replaceState(null, "", "#" + name); } catch (_) {}
+  }
   window.scrollTo(0, 0);
   if (!opts.silent) announce(`${name} screen`);
   if (name === "journey" && window.ClearPathMap) window.ClearPathMap.refresh();
@@ -268,6 +281,17 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   });
 
+  // Honour a deep link on load, and respond to back/forward.
+  const SCREENS = ["home", "profile", "journey", "ar", "visit", "assist", "story", "report", "access"];
+  const fromHash = () => {
+    const h = location.hash.slice(1);
+    return SCREENS.includes(h) ? h : null;
+  };
+  window.addEventListener("hashchange", () => {
+    const h = fromHash();
+    if (h && h !== AppState.screen) goToScreen(h);
+  });
+
   // An Arabic-speaking visitor should not have to find a toggle before the
   // app becomes readable, so the browser's own language decides the default.
   if (window.I18n && I18n.detect()) setLanguage(true);
@@ -275,6 +299,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
   renderStageList();
   populateReportStageSelect();
+
+  // Some screens (Assist) are injected by their own module on
+  // DOMContentLoaded, and this handler runs before those. Deferring by a
+  // tick lets every module finish building before we navigate.
+  const deep = fromHash();
+  if (deep && deep !== "home") setTimeout(() => goToScreen(deep, { silent: true }), 0);
 });
 
 function scoreClass(score) {

@@ -899,3 +899,69 @@ input[type="range"] { width: 100%; height: var(--tap); accent-color: var(--accen
 .setup-steps li { margin-bottom: var(--s1); }
 .assist-setup input[type="password"] { flex: 1 1 200px; min-width: 0; }
 .setup-note { font-size: var(--step-sm); color: var(--muted); margin: var(--s3) 0 0; }
+
+/* ── Route preferences ────────────────────────────────────────────── */
+.needs-panel {
+  margin: var(--s4) 0;
+  padding: var(--s4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+.needs-panel h3 { margin: 0 0 var(--s1); font-size: var(--step-h3); }
+.needs-panel > p { margin: 0 0 var(--s3); color: var(--muted); font-size: var(--step-sm); }
+.needs-grid { display: flex; flex-wrap: wrap; gap: var(--s2); }
+.need-chip {
+  appearance: none; cursor: pointer; font: inherit; font-size: var(--step-sm);
+  min-height: var(--tap); padding: var(--s2) var(--s4);
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border-strong);
+  background: var(--surface); color: var(--text);
+}
+.need-chip.active {
+  background: var(--lilac); border-color: var(--lilac); color: #FFFFFF; font-weight: 650;
+}
+.need-chip.active::before { content: "✓ "; }
+
+.route-choices { display: grid; gap: var(--s3); margin-top: var(--s4); }
+.route-choice {
+  padding: var(--s4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+/* The winner is marked by a label and weight, never by colour alone. */
+.route-choice.best { border-color: var(--accent); background: var(--accent-soft); }
+.route-choice-head { display: flex; justify-content: space-between; align-items: baseline; gap: var(--s3); margin-bottom: var(--s2); }
+.route-rank {
+  font-size: var(--step-xs); font-weight: 700; text-transform: uppercase; letter-spacing: .5px;
+  color: var(--muted);
+}
+.route-choice.best .route-rank { color: var(--accent); }
+.route-score { font-size: var(--step-h2); font-weight: 700; color: var(--accent); font-variant-numeric: tabular-nums; }
+.route-score small { font-size: var(--step-xs); font-weight: 400; color: var(--muted); }
+.route-choice p { margin: var(--s1) 0 var(--s2); color: var(--muted); font-size: var(--step-sm); }
+.reasons { display: flex; flex-wrap: wrap; gap: var(--s2); margin-bottom: var(--s2); }
+.reason {
+  font-size: var(--step-xs); border-radius: var(--radius-pill);
+  padding: 3px var(--s3); border: 1px solid var(--border);
+}
+.reason.good { color: var(--success); border-color: var(--success); background: var(--success-soft); }
+.reason.bad  { color: var(--caution); border-color: var(--caution); background: var(--caution-soft); }
+.route-facts { font-size: var(--step-xs) !important; font-variant-numeric: tabular-nums; }
+.needs-working { color: var(--muted); font-size: var(--step-sm); }
+
+/* ── VR tour ──────────────────────────────────────────────────────── */
+.vr-note { flex: 1 1 240px; color: var(--muted); font-size: var(--step-sm); align-self: center; }
+.story3d-label {
+  position: absolute; inset-inline: var(--s4); top: var(--s5);
+  max-width: 620px; margin: 0 auto;
+  padding: var(--s3) var(--s4);
+  background: rgba(12,15,20,.86); color: #FFFFFF;
+  border-radius: var(--radius-sm);
+  text-align: center;
+}
+.story3d-label strong { display: block; font-size: var(--step-h3); }
+.story3d-label span { font-size: var(--step-xs); color: rgba(255,255,255,.7); font-variant-numeric: tabular-nums; }
+.story3d-label p { margin: var(--s2) 0 0; font-size: var(--step-sm); color: rgba(255,255,255,.88); }
+#story3dTourBar { position: absolute; inset-inline: 0; bottom: 84px; }
