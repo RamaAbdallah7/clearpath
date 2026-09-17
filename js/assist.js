@@ -545,6 +545,10 @@
       b.classList.toggle("active", on);
       b.setAttribute("aria-selected", String(on));
     });
+    if (backendOff) {
+      const hint = el.assistWho.querySelector(".who-hint");
+      if (hint) hint.textContent = t("backend.off.ask");
+    }
     el.assistHint.textContent = t(
       mode === "find" ? "assist.find.hint" :
       mode === "read" ? "assist.read.hint" :
@@ -564,11 +568,18 @@
     stopFinding();
   }
 
+  let backendOff = false;
+
   function refreshLanguage() {
     I18n.apply(document.getElementById("screen-assist"));
     I18n.apply(document.getElementById("tabbar"));
     syncMode();
     syncWho();
+    // syncMode() re-shows the who-picker for ask/explain, so on a static
+    // deployment it has to be re-disabled after every language change.
+    if (backendOff) {
+      el.assistWho.querySelectorAll(".who-btn").forEach(b => { b.disabled = true; });
+    }
   }
 
   /* ── Wire up ────────────────────────────────────────────────────── */
@@ -601,12 +612,17 @@
       if (e.detail.available) return;
       const note = document.createElement("div");
       note.className = "backend-note";
-      note.innerHTML = `<strong>${t("backend.off.title")}</strong><p>${t("backend.off.body")}</p>`;
+      // Marked up with keys rather than baked strings, so switching language
+      // re-translates it like everything else — it was appearing in English
+      // on an otherwise fully Arabic page.
+      note.innerHTML = `<strong data-i18n="backend.off.title"></strong><p data-i18n="backend.off.body"></p>`;
       const card = document.querySelector("#screen-assist .card");
       card.insertBefore(note, card.querySelector(".assist-modes"));
       // Find and read run entirely in the browser, so they stay usable.
       el.assistWho.querySelectorAll('.who-btn').forEach(b => { b.disabled = true; });
-      el.assistWho.querySelector(".who-hint").textContent = t("backend.off.ask");
+      el.assistWho.querySelector(".who-hint").dataset.i18n = "backend.off.ask";
+      backendOff = true;
+      refreshLanguage();
     });
   });
 
