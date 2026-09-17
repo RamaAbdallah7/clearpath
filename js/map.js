@@ -5,6 +5,7 @@
   let cancelled = false;
   let routeLoaded = false;
   let liveRouteLine = null;
+  let fittedBounds = null;
 
   function init() {
     map = L.map("map").setView([PARK_ANCHOR.lat, PARK_ANCHOR.lng], 17);
@@ -69,7 +70,8 @@
         dashArray: result.degraded ? "10,8" : null
       }).addTo(map);
       routeLine.bringToBack();
-      map.fitBounds(routeLine.getBounds(), { padding: [30, 30] });
+      fittedBounds = routeLine.getBounds();
+      fitRoute();
       routeLoaded = true;
 
       document.getElementById("routeDistance").textContent = result.distance + " m";
@@ -202,6 +204,18 @@
       console.warn("[map] live route failed", e);
       const d = Math.round(Geo.distanceMeters(fix, target));
       speak(`You are about ${d} metres from ${target.title}, but I couldn't reach the routing service to plan a path.`);
+    }
+  }
+
+  // Leaflet measures its container when the map is created. This screen is
+  // display:none until the Map tab is opened, so without this the map is
+  // built at the wrong size and every fitBounds is computed against a stale
+  // viewport — which put the routed line off-screen entirely.
+  function fitRoute() {
+    if (!map) return;
+    map.invalidateSize({ animate: false });
+    if (fittedBounds && fittedBounds.isValid()) {
+      map.fitBounds(fittedBounds, { padding: [30, 30], animate: false });
     }
   }
 
@@ -338,12 +352,22 @@
 
   window.ClearPathMap = {
     refresh() {
-      if (!map) init();
-      else { draw(); loadRoute(); }
+      if (!map) {
+        init();
+      } else {
+        draw();
+        loadRoute();
+        // Re-measure on every visit: the container may have changed size
+        // while the screen was hidden (rotation, text scaling, contrast).
+        fitRoute();
+      }
       renderStageList();
     },
     startWalkthrough,
     stopWalkthrough,
-    showLiveFix: (fix) => { if (map) showLiveFix(fix); }
+    showLiveFix: (fix) => { if (map) showLiveFix(fix); },
+    // Exposed for debugging and for the console commands in the README.
+    get map() { return map; },
+    get routeBounds() { return fittedBounds; }
   };
 })();
