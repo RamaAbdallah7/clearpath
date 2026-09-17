@@ -240,7 +240,7 @@
     showAnswer(`<p>${t(forMode === "explain" ? "assist.explain.working" : "assist.answering")}</p>`, "loading");
 
     try {
-      const res = await fetch("/api/assist", {
+      const res = await fetch(ClearPathAPI.url("/api/assist"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ image, question, mode: forMode, lang: I18n.lang(), simple })
@@ -289,7 +289,7 @@
     const url = /^https?:\/\//i.test(raw.trim()) ? raw.trim() : "https://" + raw.trim();
     showAnswer(`<p>${t("assist.explain.working")}</p>`, "loading");
     try {
-      const res = await fetch("/api/explain", {
+      const res = await fetch(ClearPathAPI.url("/api/explain"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url, lang: I18n.lang(), simple })
@@ -400,7 +400,7 @@
     speak(t("vol.calling"));
 
     try {
-      const res = await fetch("/api/volunteer/request", {
+      const res = await fetch(ClearPathAPI.url("/api/volunteer/request"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ question, snapshot: snap, lang: I18n.lang(), mode })
@@ -417,7 +417,7 @@
   }
 
   function listenForVolunteer(id) {
-    callEvents = new EventSource(`/api/volunteer/events?role=user&id=${encodeURIComponent(id)}`);
+    callEvents = new EventSource(ClearPathAPI.url(`/api/volunteer/events?role=user&id=${encodeURIComponent(id)}`));
 
     callEvents.addEventListener("accepted", async () => {
       el.assistCallState.textContent = t("vol.connected");
@@ -475,7 +475,7 @@
   }
 
   function sendSignal(id, signal) {
-    fetch("/api/volunteer/signal", {
+    fetch(ClearPathAPI.url("/api/volunteer/signal"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id, from: "user", signal })
@@ -486,7 +486,7 @@
     if (peer) { try { peer.close(); } catch (_) {} peer = null; }
     if (callEvents) { callEvents.close(); callEvents = null; }
     if (callId) {
-      fetch("/api/volunteer/end", {
+      fetch(ClearPathAPI.url("/api/volunteer/end"), {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: callId })
       }).catch(() => {});
@@ -594,6 +594,20 @@
 
     refreshLanguage();
     window.addEventListener("clearpath:language", refreshLanguage);
+
+    // On a static deployment there is no helper service. Say so once, up
+    // front, instead of letting each button fail separately when tapped.
+    window.addEventListener("clearpath:backend", (e) => {
+      if (e.detail.available) return;
+      const note = document.createElement("div");
+      note.className = "backend-note";
+      note.innerHTML = `<strong>${t("backend.off.title")}</strong><p>${t("backend.off.body")}</p>`;
+      const card = document.querySelector("#screen-assist .card");
+      card.insertBefore(note, card.querySelector(".assist-modes"));
+      // Find and read run entirely in the browser, so they stay usable.
+      el.assistWho.querySelectorAll('.who-btn').forEach(b => { b.disabled = true; });
+      el.assistWho.querySelector(".who-hint").textContent = t("backend.off.ask");
+    });
   });
 
   window.ClearPathAssist = {

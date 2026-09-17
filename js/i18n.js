@@ -93,6 +93,11 @@
       "visit.intro": "See the park before you decide to make the trip — the gate, the paths, the toilets and the assembly point, in photographs taken at Al Jahili Park itself. Works offline and needs no API key of any kind.",
       "visit.exits": "Every way out",
       "visit.exits.intro": "Gates mapped in OpenStreetMap. In an evacuation the nearest exit depends on where you are — so here is all of them, not just the main one.",
+
+      // Shown on a static deployment, where there is no backend to answer.
+      "backend.off.title": "AI answers and volunteers need the local server",
+      "backend.off.body": "This published copy is a static site, so it cannot run the helper service. Everything else works: the routed map, facilities, obstacle alerts, the path line, the virtual visit, and both languages. To use AI answers, link explanations and volunteers, run the app from your own machine.",
+      "backend.off.ask": "Asking a volunteer and AI answers are unavailable here.",
       "assist.camera.denied": "Camera access is blocked. Allow it in your browser settings and try again.",
       "assist.offline": "The assist service isn't running. Start the local proxy to use AI answers and volunteers.",
 
@@ -180,6 +185,10 @@
       "visit.intro": "شاهد الحديقة قبل أن تقرّر الذهاب — البوابة والممرات ودورات المياه ونقطة التجمّع، في صور التُقطت في حديقة الجاهلي نفسها. تعمل بلا إنترنت ولا تحتاج أي مفتاح برمجي.",
       "visit.exits": "كل المخارج",
       "visit.exits.intro": "بوابات موثّقة في خرائط الشارع المفتوحة. في حالة الإخلاء يعتمد أقرب مخرج على موقعك — لذا هذه كلها، لا المدخل الرئيسي وحده.",
+
+      "backend.off.title": "إجابات الذكاء الاصطناعي والمتطوّعون تحتاج الخادم المحلي",
+      "backend.off.body": "هذه النسخة المنشورة موقع ثابت، فلا يمكنها تشغيل خدمة المساعدة. أما البقية فتعمل: الخريطة والمسار، والمرافق، وتنبيهات العوائق، وخط المسار، والزيارة الافتراضية، واللغتان. ولاستخدام إجابات الذكاء الاصطناعي وشرح الروابط والمتطوّعين، شغّل التطبيق من جهازك.",
+      "backend.off.ask": "طلب متطوّع وإجابات الذكاء الاصطناعي غير متاحة هنا.",
       "assist.camera.denied": "الوصول إلى الكاميرا محجوب. اسمح به في إعدادات المتصفح ثم أعد المحاولة.",
       "assist.offline": "خدمة المساعدة غير مُشغَّلة. شغّل الخادم المحلي لاستخدام إجابات الذكاء الاصطناعي والمتطوّعين.",
 

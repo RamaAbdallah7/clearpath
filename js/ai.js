@@ -53,7 +53,7 @@ Style:
 
   async function ask({ prompt, maxTokens }) {
     try {
-      const response = await fetch("/api/chat", {
+      const response = await fetch(ClearPathAPI.url("/api/chat"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -85,7 +85,7 @@ Style:
   // whether AI cues are actually going to happen.
   async function probe() {
     try {
-      const res = await fetch("/api/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ messages: [{ role: "user", content: "ping" }], max_tokens: 5 }) });
+      const res = await fetch(ClearPathAPI.url("/api/chat"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ messages: [{ role: "user", content: "ping" }], max_tokens: 5 }) });
       available = res.ok;
     } catch (_) {
       available = false;

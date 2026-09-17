@@ -16,7 +16,7 @@
 // draw, clearly labelled as such, rather than silently pretending.
 (function () {
   const VALHALLA_URL = "https://valhalla1.openstreetmap.de/route";
-  const PROXY_ROUTE_URL = "/api/route";   // optional ORS-via-proxy
+  const PROXY_ROUTE = "/api/route";   // optional ORS-via-proxy
   const CACHE = new Map();
   const TIMEOUT_MS = 12000;
 
@@ -120,7 +120,7 @@
   // configured, so the caller just moves on to Valhalla.
   async function viaProxyORS(points, profile) {
     try {
-      const res = await withTimeout(fetch(PROXY_ROUTE_URL, {
+      const res = await withTimeout(fetch(ClearPathAPI.url(PROXY_ROUTE), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ points: points.map(p => [p.lng, p.lat]), profile })

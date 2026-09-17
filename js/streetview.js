@@ -159,7 +159,7 @@
         ? "ماذا أرى في هذه الصورة؟ ركّز على سطح المشي والدرجات والظل وأماكن الجلوس."
         : "What am I looking at? Focus on the walking surface, steps, shade and places to sit.";
 
-      const res = await fetch("/api/assist", {
+      const res = await fetch(ClearPathAPI.url("/api/assist"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ image, question, mode: "ask", lang: I18n.lang() })

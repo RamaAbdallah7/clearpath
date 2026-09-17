@@ -1171,3 +1171,16 @@ video.headcam-preview {
   .assist-stage { aspect-ratio: 3 / 4; }
   .who-hint { flex-basis: 100%; }
 }
+
+/* ── Static-deployment notice ───────────────────────────────────── */
+.backend-note {
+  margin: 12px 0;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-inline-start: 5px solid #c68a00;
+  border-radius: var(--radius-sm);
+  background: var(--surface-raised);
+}
+.backend-note strong { display: block; margin-bottom: 4px; }
+.backend-note p { margin: 0; color: var(--muted); font-size: 0.9rem; }
+.who-btn:disabled { opacity: 0.45; cursor: not-allowed; }
