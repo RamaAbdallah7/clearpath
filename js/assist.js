@@ -287,9 +287,86 @@
   }
 
   function offline() {
+    const needsKey = !ClearPathAPI.available && window.ClearPathGemini && !ClearPathGemini.hasKey;
+    if (needsKey) {
+      showAnswer(
+        `<p>${t("setup.needkey")}</p>` +
+        `<div class="assist-escalate"><button class="btn primary" id="assistSetupNow">${t("setup.cta")}</button></div>`,
+        "error");
+      speak(t("setup.needkey"));
+      document.getElementById("assistSetupNow").addEventListener("click", () => {
+        showSetupCard(true);
+      });
+      busy = false;
+      return;
+    }
     showAnswer(`<p>${t("assist.offline")}</p>`, "error");
     speak(t("assist.offline"));
     busy = false;
+  }
+
+  /* ── Inline key setup ──
+     This used to live only in Settings, on a screen with no tab in the
+     bottom navigation — so in practice it could not be found, and the
+     feature looked broken. It now appears where the problem occurs. */
+  function showSetupCard(focus) {
+    let card = document.getElementById("assistSetup");
+    if (!card) {
+      card = document.createElement("div");
+      card.id = "assistSetup";
+      card.className = "assist-setup";
+      card.innerHTML = `
+        <h3>${t("setup.h")}</h3>
+        <p>${t("setup.body")}</p>
+        <ol class="setup-steps">
+          <li><a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">${t("setup.step1")}</a></li>
+          <li>${t("setup.step2")}</li>
+        </ol>
+        <div class="row">
+          <input type="password" id="assistKeyInput" autocomplete="off" spellcheck="false"
+                 placeholder="${t("gemini.placeholder")}" aria-label="${t("gemini.placeholder")}">
+          <button class="btn primary" id="assistKeySave">${t("gemini.save")}</button>
+        </div>
+        <p class="key-status" id="assistKeyStatus" role="status" aria-live="polite"></p>
+        <p class="setup-note">${t("setup.privacy")}</p>`;
+      const host = document.querySelector("#screen-assist .card");
+      host.insertBefore(card, host.querySelector(".assist-stage"));
+
+      document.getElementById("assistKeySave").addEventListener("click", async () => {
+        const input = document.getElementById("assistKeyInput");
+        const status = document.getElementById("assistKeyStatus");
+        const v = input.value.trim();
+        if (!v) return;
+        status.textContent = t("gemini.testing"); status.dataset.state = "checking";
+        ClearPathGemini.setKey(v);
+        const r = await ClearPathGemini.test();
+        if (r.ok) {
+          status.textContent = t("gemini.ok"); status.dataset.state = "ok";
+          input.value = "";
+          speak(t("gemini.ok"));
+          toast(t("gemini.ok"));
+          setTimeout(() => { card.remove(); refreshBackendNote(); }, 1400);
+        } else {
+          ClearPathGemini.setKey("");
+          status.textContent = t(r.reason === "network" ? "gemini.network" : "gemini.badkey");
+          status.dataset.state = "bad";
+          speak(status.textContent);
+        }
+      });
+    }
+    card.scrollIntoView({ block: "center", behavior: "smooth" });
+    if (focus) setTimeout(() => document.getElementById("assistKeyInput")?.focus(), 350);
+  }
+
+  function refreshBackendNote() {
+    document.querySelectorAll("#screen-assist .backend-note").forEach(n => n.remove());
+    if (!ClearPathAPI.available) {
+      if (window.ClearPathGemini && ClearPathGemini.hasKey) showVolunteerOnlyNote();
+    }
+    el.assistWho.querySelectorAll(".who-btn").forEach(b => {
+      b.disabled = (b.dataset.who === "volunteer") ? !ClearPathAPI.available : false;
+    });
+    syncWho();
   }
 
   function escapeHtml(s) {
@@ -660,6 +737,21 @@
       // A visitor who has supplied their own key does have AI answers, so
       // telling them otherwise would be wrong. Only volunteers need a server.
       if (window.ClearPathGemini && ClearPathGemini.hasKey) { showVolunteerOnlyNote(); return; }
+
+      // No backend and no key. Show the setup card and STOP — the old note
+      // told people to run a server from their own machine, which sat above
+      // the setup card contradicting it and made the feature look dead.
+      if (window.ClearPathGemini) {
+        showSetupCard(false);
+        backendOff = true;
+        el.assistWho.querySelector('[data-who="volunteer"]').disabled = true;
+        el.assistWho.querySelector(".who-hint").dataset.i18n = "setup.volunteers";
+        answerWho = "ai";
+        I18n.apply(document.getElementById("screen-assist"));
+        syncWho();
+        return;
+      }
+
       const note = document.createElement("div");
       note.className = "backend-note";
       // Marked up with keys rather than baked strings, so switching language

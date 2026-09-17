@@ -881,3 +881,21 @@ input[type="range"] { width: 100%; height: var(--tap); accent-color: var(--accen
   margin-top: var(--s3); font-size: var(--step-sm);
   color: var(--caution); font-style: italic;
 }
+
+/* ── Inline key setup ─────────────────────────────────────────────────
+   Shown on the Assist screen itself. It previously lived only in Settings,
+   on a screen with no tab, so nobody found it and the feature looked dead. */
+.assist-setup {
+  border: 1px solid var(--accent);
+  border-inline-start: 4px solid var(--accent);
+  background: var(--accent-soft);
+  border-radius: var(--radius-sm);
+  padding: var(--s4);
+  margin-bottom: var(--s4);
+}
+.assist-setup h3 { margin: 0 0 var(--s2); color: var(--accent); }
+.assist-setup p { margin: 0 0 var(--s3); }
+.setup-steps { margin: 0 0 var(--s3); padding-inline-start: var(--s5); color: var(--muted); }
+.setup-steps li { margin-bottom: var(--s1); }
+.assist-setup input[type="password"] { flex: 1 1 200px; min-width: 0; }
+.setup-note { font-size: var(--step-sm); color: var(--muted); margin: var(--s3) 0 0; }
