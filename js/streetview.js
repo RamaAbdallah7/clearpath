@@ -1,139 +1,115 @@
 // streetview.js — "Visit before you travel".
 //
-// A pre-visit walkthrough of the real park in Google Street View, so a
-// visitor can see the gate, the paths, the toilets and the assembly point
-// from home. The workshop deck's point that unexpected changes are a major
-// stressor applies just as much to an adult planning a trip as to the child
-// the storybook was written for — the difference is an adult wants the real
-// place, not an illustration of it.
+// A pre-visit walkthrough of the park, so a visitor can see the gate, the
+// paths, the toilets and the assembly point from home. The workshop deck's
+// point that unexpected changes are a major stressor applies just as much to
+// an adult planning a trip as to the child the storybook was written for —
+// the difference is the adult wants the real place.
 //
-// Uses the Maps EMBED API deliberately, not the Maps JavaScript API. The
-// Embed API is free to use with no usage cap, which matters for a student
-// project that may be left running; the JS API bills per panorama load once
-// the monthly credit is gone. The cost is control: an iframe can be pointed
-// at a panorama, heading and pitch, and that is all. For a curated tour of
-// verified viewpoints, that is enough.
+// It was built on Google Street View first, which does cover this site. That
+// was dropped on request, and the keyless alternatives were checked rather
+// than assumed: Panoramax returns nothing for the park's bounding box, and
+// Mapillary will not answer without an OAuth token and shows no captures
+// here. There is no free 360° imagery of Al Jahili Park.
 //
-// No key, no problem: the screen falls back to the existing photo viewer in
-// story3d.js, which needs nothing and already works offline.
+// So this runs on the site's own photographs instead. Everything now needs
+// no API key at all — the whole screen works offline — and the "what am I
+// looking at" guide reads the local photo through the same vision model the
+// assist screen uses, so there is one optional key in the project instead of
+// three.
 (function () {
-  const KEY_STORAGE = "clearpath_gmaps_key";
   let current = 0;
-  // Heading offset applied on top of the viewpoint's own heading, so the
-  // visitor can turn on the spot and ask about a different direction.
-  let headingOffset = 0;
   let describing = false;
 
-  function activeHeading(vp) {
-    return (((vp.heading ?? 0) + headingOffset) % 360 + 360) % 360;
-  }
-
-  const frame = () => document.getElementById("svFrame");
+  const t = (k) => I18n.t(k);
   const stage = () => document.getElementById("svStage");
 
-  function getKey() {
-    try { return localStorage.getItem(KEY_STORAGE) || ""; } catch (_) { return ""; }
-  }
-  function setKey(k) {
-    try { k ? localStorage.setItem(KEY_STORAGE, k) : localStorage.removeItem(KEY_STORAGE); } catch (_) {}
-  }
+  function vp() { return PARK_VIEWPOINTS[current]; }
 
-  function embedUrl(vp, key) {
-    const base = "https://www.google.com/maps/embed/v1/streetview";
-    const params = new URLSearchParams({ key, heading: String(activeHeading(vp)), pitch: String(vp.pitch ?? 0), fov: "90" });
-    // Prefer a verified panorama ID where we captured one: `location` lets
-    // Google pick, and it can pick a different (or no) panorama over time.
-    if (vp.pano) params.set("pano", vp.pano);
-    else params.set("location", `${vp.location.lat},${vp.location.lng}`);
-    return `${base}?${params.toString()}`;
-  }
-
-  // Without a key there is nothing to embed, so say exactly what to do
-  // rather than showing a broken grey box.
-  function renderKeyPrompt() {
-    stage().innerHTML = `
-      <div class="sv-keyprompt">
-        <h3>Add a Google Maps key to walk the park</h3>
-        <p>The virtual visit streams real 360° imagery of Al Jahili Park through Google's
-          <strong>Maps Embed API</strong>, which is free to use with no usage limit. It needs your own
-          key.</p>
-        <ol>
-          <li>Open <a href="https://console.cloud.google.com/google/maps-apis/credentials" target="_blank" rel="noopener">Google Cloud → Maps credentials</a> and create an API key.</li>
-          <li>Enable <strong>Maps Embed API</strong> for it.</li>
-          <li>Paste it below. It is stored only in this browser and never sent anywhere except Google.</li>
-        </ol>
-        <div class="row">
-          <input type="password" id="svKeyInput" placeholder="AIza…" autocomplete="off" aria-label="Google Maps API key">
-          <button class="btn primary" id="svKeySave" type="button">Save key</button>
-        </div>
-        <p class="sv-fallback-note">No key? The <button class="linklike" type="button" data-goto="story">pre-visit story</button>
-          works with no key at all and uses the site's own photos.</p>
-      </div>`;
-    document.getElementById("svKeySave").addEventListener("click", () => {
-      const v = document.getElementById("svKeyInput").value.trim();
-      if (!v) { toast("Paste a key first"); return; }
-      setKey(v);
-      toast("Key saved — loading the park");
-      render();
-    });
+  // Content fields fall back to English when no Arabic exists, and arrays
+  // need the same treatment as strings.
+  function txList(o, field) {
+    if (I18n.lang() === "ar" && o.ar && Array.isArray(o.ar[field])) return o.ar[field];
+    return o[field] || [];
   }
 
   function renderViewpointList() {
     const list = document.getElementById("svList");
     list.innerHTML = "";
-    PARK_VIEWPOINTS.forEach((vp, i) => {
+    PARK_VIEWPOINTS.forEach((v, i) => {
       const btn = document.createElement("button");
       btn.type = "button";
-      btn.className = "sv-chip" + (i === current ? " active" : "") + " kind-" + vp.kind;
+      btn.className = "sv-chip" + (i === current ? " active" : "") + " kind-" + v.kind;
       btn.setAttribute("aria-pressed", String(i === current));
-      btn.textContent = vp.title;
-      btn.addEventListener("click", () => { current = i; headingOffset = 0; render(); });
+      btn.textContent = I18n.tx(v, "title");
+      btn.addEventListener("click", () => { current = i; render(); });
       list.appendChild(btn);
     });
   }
 
-  function renderInfo(vp) {
+  function renderStage() {
+    const v = vp();
+    stage().innerHTML = `
+      <img id="svPhoto" src="${v.photo}" alt="${I18n.tx(v, "blurb")}">
+      <div class="sv-controls">
+        <button class="btn secondary sv-3d" id="sv3d">🥽 ${I18n.lang() === "ar" ? "ادخل المشهد" : "Step into it"}</button>
+        <button class="btn primary sv-ask" id="svAsk">👁 ${I18n.lang() === "ar" ? "ماذا أرى هنا؟" : "What am I looking at?"}</button>
+      </div>
+      <div class="sv-guide" id="svGuide" hidden aria-live="polite"></div>`;
+
+    // The immersive viewer that already shipped with the app: it maps a flat
+    // photo onto a wide curved arc rather than a sphere, which is the honest
+    // way to "step into" a single frame without pinching it at the poles.
+    document.getElementById("sv3d").addEventListener("click", () => {
+      window.ClearPathStory3D.open({ photo: v.photo });
+    });
+    document.getElementById("svAsk").addEventListener("click", () => describeView(v));
+  }
+
+  function renderInfo() {
+    const v = vp();
     const info = document.getElementById("svInfo");
-    const services = vp.services.map(s => `<li>${s}</li>`).join("");
+    const services = txList(v, "services").map(s => `<li>${s}</li>`).join("");
+    const caution = I18n.tx(v, "caution");
     info.innerHTML = `
-      <h3>${vp.title}</h3>
-      <p class="sv-blurb">${vp.blurb}</p>
-      <p class="sv-coverage">Imagery: ${vp.coverage}</p>
+      <h3>${I18n.tx(v, "title")}</h3>
+      <p class="sv-blurb">${I18n.tx(v, "blurb")}</p>
+      <p class="sv-coverage">${v.source}</p>
 
       <div class="sv-panel">
-        <h4>Services here</h4>
+        <h4>${I18n.lang() === "ar" ? "الخدمات هنا" : "Services here"}</h4>
         <ul class="sv-services">${services}</ul>
       </div>
 
       <div class="sv-panel good">
-        <h4>What's good about it</h4>
-        <p>${vp.good}</p>
+        <h4>${I18n.lang() === "ar" ? "ما يميّزه" : "What's good about it"}</h4>
+        <p>${I18n.tx(v, "good")}</p>
       </div>
 
-      ${vp.caution ? `<div class="sv-panel caution"><h4>Worth knowing</h4><p>${vp.caution}</p></div>` : ""}
+      ${caution ? `<div class="sv-panel caution"><h4>${I18n.lang() === "ar" ? "انتبه إلى" : "Worth knowing"}</h4><p>${caution}</p></div>` : ""}
 
       <div class="sv-panel emergency">
-        <h4>If something goes wrong</h4>
-        <p>${vp.emergency}</p>
+        <h4>${I18n.lang() === "ar" ? "إن حدث طارئ" : "If something goes wrong"}</h4>
+        <p>${I18n.tx(v, "emergency")}</p>
       </div>
 
       <div class="row" style="margin-top:12px;">
-        <button class="btn primary" id="svSpeak" type="button">🔊 Read this aloud</button>
-        <button class="btn secondary" id="svNext" type="button">Next viewpoint →</button>
+        <button class="btn primary" id="svSpeak">${t("common.speak")}</button>
+        <button class="btn secondary" id="svNext">${I18n.lang() === "ar" ? "المحطة التالية ←" : "Next viewpoint →"}</button>
       </div>`;
 
     document.getElementById("svSpeak").addEventListener("click", () => {
-      // Read it the way the storybook reads: slower and gentler. Someone
-      // using this is preparing, not navigating.
-      const text = `${vp.title}. ${vp.blurb} Services here: ${vp.services.join(", ")}. ` +
-        `What's good about it: ${vp.good} ` +
-        (vp.caution ? `Worth knowing: ${vp.caution} ` : "") +
-        `If something goes wrong: ${vp.emergency}`;
+      // Read at the storybook pace: someone using this is preparing for a
+      // trip, not navigating one.
+      const text = [
+        I18n.tx(v, "title"), I18n.tx(v, "blurb"),
+        (I18n.lang() === "ar" ? "الخدمات: " : "Services: ") + txList(v, "services").join("، "),
+        I18n.tx(v, "good"), caution, I18n.tx(v, "emergency")
+      ].filter(Boolean).join(". ");
       speak(text, "calm");
     });
     document.getElementById("svNext").addEventListener("click", () => {
       current = (current + 1) % PARK_VIEWPOINTS.length;
-      headingOffset = 0;
       render();
     });
   }
@@ -142,35 +118,8 @@
     const el = document.getElementById("svExits");
     if (!el) return;
     el.innerHTML = PARK_EXITS.map(x =>
-      `<li><strong>${x.label}</strong><span>${x.lat.toFixed(5)}, ${x.lng.toFixed(5)}</span></li>`
+      `<li><strong>${I18n.lang() === "ar" ? x.ar : x.label}</strong><span>${x.lat.toFixed(5)}, ${x.lng.toFixed(5)}</span></li>`
     ).join("");
-  }
-
-  function render() {
-    const key = getKey();
-    const vp = PARK_VIEWPOINTS[current];
-    renderViewpointList();
-    renderInfo(vp);
-    renderExits();
-
-    if (!key) { renderKeyPrompt(); return; }
-
-    stage().innerHTML = `
-      <iframe id="svFrame" title="Street View of ${vp.title}"
-        loading="lazy" allowfullscreen referrerpolicy="no-referrer-when-downgrade"
-        src="${embedUrl(vp, key)}"></iframe>
-
-      <div class="sv-controls">
-        <button class="sv-turn" id="svLeft" type="button" aria-label="Turn left">↺</button>
-        <button class="btn primary sv-ask" id="svAsk" type="button">👁 What am I looking at?</button>
-        <button class="sv-turn" id="svRight" type="button" aria-label="Turn right">↻</button>
-      </div>
-
-      <div class="sv-guide" id="svGuide" hidden aria-live="polite"></div>`;
-
-    document.getElementById("svLeft").addEventListener("click", () => { headingOffset -= 45; render(); });
-    document.getElementById("svRight").addEventListener("click", () => { headingOffset += 45; render(); });
-    document.getElementById("svAsk").addEventListener("click", () => describeView(vp));
   }
 
   function showGuide(html, kind) {
@@ -182,80 +131,77 @@
   }
 
   /* ── The AI guide ──
-     Sends only where we are looking; the proxy fetches the matching Street
-     View still and runs it past a vision model. The image URL carries the
-     Google key, so it is built and used server-side and never here.
+     Loads the local photo into a canvas and sends it to the same /api/assist
+     endpoint the camera uses. No Google key, no server-side image fetch —
+     the picture is already ours. */
+  function photoToDataUrl(img) {
+    const c = document.createElement("canvas");
+    const scale = Math.min(1, 900 / (img.naturalWidth || 900));
+    c.width = Math.round((img.naturalWidth || 900) * scale);
+    c.height = Math.round((img.naturalHeight || 600) * scale);
+    c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+    return c.toDataURL("image/jpeg", 0.8);
+  }
 
-     When the proxy isn't running (or has no keys) this falls back to the
-     verified facts for this viewpoint, clearly labelled as such — a written
-     description of a place is honest; a guessed one is not. */
-  async function describeView(vp) {
+  async function describeView(v) {
     if (describing) return;
     describing = true;
     const btn = document.getElementById("svAsk");
     btn.disabled = true;
-    btn.textContent = "👁 Looking…";
-    showGuide(`<p class="sv-guide-loading">Looking at this view…</p>`, "loading");
-
-    const needs = [...(AppState.profile || [])].join(", ");
-    const facts = [
-      vp.title, vp.blurb,
-      "Services: " + vp.services.join(", "),
-      vp.caution ? "Caution: " + vp.caution : ""
-    ].filter(Boolean).join("\n");
+    showGuide(`<p class="sv-guide-loading">${t("assist.answering")}</p>`, "loading");
 
     try {
-      const res = await fetch("/api/look", {
+      const img = document.getElementById("svPhoto");
+      if (!img.complete) await new Promise(r => { img.onload = r; img.onerror = r; });
+      const image = photoToDataUrl(img);
+
+      const question = I18n.lang() === "ar"
+        ? "ماذا أرى في هذه الصورة؟ ركّز على سطح المشي والدرجات والظل وأماكن الجلوس."
+        : "What am I looking at? Focus on the walking surface, steps, shade and places to sit.";
+
+      const res = await fetch("/api/assist", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          pano: vp.pano || null,
-          lat: vp.location.lat, lng: vp.location.lng,
-          heading: activeHeading(vp), pitch: vp.pitch ?? 0, fov: 90,
-          facts, needs
-        })
+        body: JSON.stringify({ image, question, mode: "ask", lang: I18n.lang() })
       });
       const data = await res.json().catch(() => ({}));
 
-      if (res.ok && data.text) {
-        showGuide(
-          `<p>${data.text}</p><p class="sv-guide-src">Described from the Street View image at ${Math.round(activeHeading(vp))}°</p>`,
-          "ai");
-        speak(data.text, "calm");
-      } else if (data.reason === "no-imagery") {
-        showGuide(`<p>There's no Street View image facing this way. Try turning with the arrows.</p>`, "empty");
+      if (res.ok && data.answer) {
+        showGuide(`<p>${data.answer}</p><p class="sv-guide-src">${I18n.lang() === "ar" ? "وصف من الصورة نفسها" : "Described from this photo"}</p>`, "ai");
+        speak(data.answer, "calm");
       } else {
-        fallbackGuide(vp);
+        fallbackGuide(v);
       }
     } catch (_) {
-      fallbackGuide(vp);
+      fallbackGuide(v);
     } finally {
       describing = false;
       btn.disabled = false;
-      btn.textContent = "👁 What am I looking at?";
     }
   }
 
-  function fallbackGuide(vp) {
-    const text = `${vp.blurb} ${vp.good}`;
+  // A written description of a real place is honest; a guessed one is not.
+  // So when the proxy is not running we say so and use the verified text.
+  function fallbackGuide(v) {
+    const text = `${I18n.tx(v, "blurb")} ${I18n.tx(v, "good")}`;
     showGuide(
-      `<p>${text}</p>
-       <p class="sv-guide-src">Written description — the live scene guide needs the local proxy running
-       with a Google Maps key. Nothing here is guessed.</p>`,
+      `<p>${text}</p><p class="sv-guide-src">${I18n.lang() === "ar"
+        ? "وصف مكتوب — الوصف الحيّ يحتاج تشغيل الخادم المحلي. لا شيء هنا مُخمَّن."
+        : "Written description — the live guide needs the local proxy running. Nothing here is guessed."}</p>`,
       "fallback");
     speak(text, "calm");
   }
 
+  function render() {
+    renderViewpointList();
+    renderStage();
+    renderInfo();
+    renderExits();
+  }
+
   document.addEventListener("DOMContentLoaded", () => {
-    const changeBtn = document.getElementById("svChangeKey");
-    if (changeBtn) {
-      changeBtn.addEventListener("click", () => {
-        setKey("");
-        toast("Key cleared");
-        render();
-      });
-    }
     render();
+    window.addEventListener("clearpath:language", render);
   });
 
   window.ClearPathStreetView = {
@@ -263,7 +209,6 @@
     go: (id) => {
       const i = PARK_VIEWPOINTS.findIndex(v => v.id === id);
       if (i >= 0) { current = i; render(); }
-    },
-    hasKey: () => !!getKey()
+    }
   };
 })();

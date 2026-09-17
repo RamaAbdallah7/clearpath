@@ -146,10 +146,16 @@ Style:
     if (!enabled || available === false) return null;
 
     const profileKey = [...(AppState.profile || [])].sort().join(",") || "none";
-    const key = `${stage.id}|${profileKey}|${ctx.distance != null ? Math.round(ctx.distance / 25) : "x"}|${ctx.obstacle || ""}`;
+    const key = `${stage.id}|${I18n.lang()}|${profileKey}|${ctx.distance != null ? Math.round(ctx.distance / 25) : "x"}|${ctx.obstacle || ""}`;
     if (cache[key]) return cache[key];
 
+    const langLine = I18n.lang() === "ar"
+      ? "Write the cue in Arabic (Modern Standard Arabic, as used in the UAE). Do not write in English."
+      : "Write the cue in English.";
+
     const prompt = `${needsFor(AppState.profile)}
+
+${langLine}
 
 FACTS:
 ${factsFor(stage, ctx)}
@@ -166,12 +172,15 @@ Write the spoken cue for this stage, for this visitor.`;
      The timeout matters — someone walking toward a gate cannot wait three
      seconds to be told which way to turn, so the written cue wins on delay. */
   async function speakStage(stage, ctx = {}, warmth) {
-    if (!enabled || available === false) { speak(stage.cue, warmth); return stage.cue; }
+    // The written fallback has to follow the chosen language too, or Arabic
+    // speakers silently get English the moment the proxy isn't running.
+    const written = I18n.tx(stage, "cue") || stage.cue;
+    if (!enabled || available === false) { speak(written, warmth); return written; }
     const raced = await Promise.race([
       cueFor(stage, ctx),
       new Promise(resolve => setTimeout(() => resolve(null), 2500))
     ]);
-    const text = raced || stage.cue;
+    const text = raced || written;
     speak(text, warmth);
     return text;
   }

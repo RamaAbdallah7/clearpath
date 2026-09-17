@@ -369,12 +369,9 @@
   <section class="screen" id="screen-visit" aria-labelledby="visit-h">
     <div class="card">
       <div class="row between" style="align-items:flex-start;">
-        <h2 id="visit-h" style="margin-bottom:4px;">Visit before you travel</h2>
-        <button class="btn secondary small" id="svChangeKey" type="button">Change key</button>
+        <h2 id="visit-h" style="margin-bottom:4px;" data-i18n="visit.title">Visit before you travel</h2>
       </div>
-      <p style="color:var(--muted)">Walk the real park in 360&deg; from wherever you are — see the gate,
-        the paths, the toilets and the assembly point before you decide to make the trip. The imagery is
-        Google Street View of Al Jahili Park itself, not a drawing of it.</p>
+      <p style="color:var(--muted)" data-i18n="visit.intro"></p>
 
       <div class="sv-list" id="svList" role="group" aria-label="Viewpoints"></div>
       <div class="sv-stage" id="svStage"></div>
@@ -388,9 +385,8 @@
          can't evacuate from it. Every gate is listed, because "the nearest
          exit" depends on where you are standing. -->
     <div class="card">
-      <h3>Every way out</h3>
-      <p style="color:var(--muted)">Gates mapped in OpenStreetMap. In an evacuation the nearest exit
-        depends on where you are — so here is all of them, not just the main one.</p>
+      <h3 data-i18n="visit.exits">Every way out</h3>
+      <p style="color:var(--muted)" data-i18n="visit.exits.intro"></p>
       <ul class="sv-exits" id="svExits"></ul>
     </div>
   </section>
@@ -557,6 +553,7 @@
 </nav>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="js/i18n.js"></script>
 <script src="js/toast.js"></script>
 <script src="js/sensory.js"></script>
 <script src="js/journey-data.js"></script>
@@ -573,6 +570,7 @@
 <script src="js/ar.js"></script>
 <script src="js/arpath.js"></script>
 <script src="js/streetview.js"></script>
+<script src="js/assist.js"></script>
 <!-- MediaPipe ships as ESM only, so this one is a module. It sets
      window.ClearPathVision when ready and the AR screen waits for it. -->
 <script type="module" src="js/vision.js"></script>

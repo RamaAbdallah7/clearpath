@@ -45,7 +45,7 @@
         .map(b => `${b.label} ${b.earned}/${b.max}`).join(" · ");
 
       marker.bindPopup(
-        `<strong>${stage.stage}. ${stage.title}</strong><br>${stage.description}` +
+        `<strong>${stage.stage}. ${I18n.tx(stage, "title")}</strong><br>${I18n.tx(stage, "description")}` +
         `<br><small style="color:#64748b">OSM: ${stage.osm}</small>` +
         `<br><small>Confidence ${score}% — ${breakdown}</small>` +
         (flagged ? `<br><em style="color:#a8461e">May not suit your selected profile</em>` : "")
@@ -298,7 +298,7 @@
   async function announceStage(stage, isFirst) {
     highlightStage(stage.stage - 1);
     map.flyTo([stage.lat, stage.lng], 18, { duration: 1 });
-    walker.bindTooltip(`${stage.stage}. ${stage.title}`, { permanent: true, direction: "top", offset: [0, -10] }).openTooltip();
+    walker.bindTooltip(`${stage.stage}. ${I18n.tx(stage, "title")}`, { permanent: true, direction: "top", offset: [0, -10] }).openTooltip();
     if (!isFirst) { Sensory.earcon("stage"); if (AppState.settings.haptics) Sensory.vibrate([60, 30, 60]); }
     await ClearPathAI.speakStage(stage);
     await sleep(2600);

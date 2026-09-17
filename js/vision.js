@@ -250,9 +250,55 @@ function stop() {
   setStatus("Obstacle detection off", "idle");
 }
 
+/* ── Raw detection feed ──
+   The assist screen's "find an object" mode needs the detections themselves,
+   not this module's barrier interpretation of them: it is looking for one
+   named thing and steering a beacon by how large it appears, so the
+   ahead/close filtering and the spoken alerts would both get in the way.
+
+   It runs on a different <video> (the assist camera, not the AR camera), so
+   it is kept as a separate loop rather than sharing state with the AR one. */
+let rawRunning = false;
+let rawVideo = null;
+let rawLast = [];
+let rawTime = -1;
+
+function rawLoop() {
+  if (!rawRunning) return;
+  requestAnimationFrame(rawLoop);
+  if (!detector || !rawVideo || rawVideo.readyState < 2) return;
+  if (rawVideo.currentTime === rawTime) return;
+  rawTime = rawVideo.currentTime;
+  try {
+    rawLast = detector.detectForVideo(rawVideo, performance.now()).detections || [];
+  } catch (e) {
+    console.warn("[vision] raw detect failed", e);
+  }
+}
+
+async function startRaw(videoEl) {
+  const ok = await load();
+  if (!ok) return false;
+  rawVideo = videoEl;
+  rawRunning = true;
+  rawTime = -1;
+  rawLast = [];
+  requestAnimationFrame(rawLoop);
+  return true;
+}
+
+function stopRaw() {
+  rawRunning = false;
+  rawVideo = null;
+  rawLast = [];
+}
+
 window.ClearPathVision = {
   start,
   stop,
+  startRaw,
+  stopRaw,
+  rawDetections: () => (rawRunning ? rawLast : null),
   preload: load,
   get isRunning() { return running; },
   get count() { return detectionCount; },

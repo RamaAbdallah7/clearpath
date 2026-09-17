@@ -130,7 +130,7 @@
     const relative = bearing != null ? ((bearing - heading) + 360) % 360 : null;
     arrow.style.opacity = relative == null ? "0.25" : "1";
     if (relative != null) arrow.style.transform = `rotate(${relative}deg)`;
-    banner.textContent = `Stage ${target.stage}/${JOURNEY.length}: ${target.title} — ${target.cue}`;
+    banner.textContent = `${target.stage}/${JOURNEY.length} · ${I18n.tx(target, "title")} — ${I18n.tx(target, "cue")}`;
 
     if (mode === "live") {
       const q = Geo.quality();
@@ -309,7 +309,7 @@
       hideEl.classList.remove("visible");
 
       distanceEl.textContent = `${stage.stage} of ${JOURNEY.length}`;
-      banner.textContent = `Stage ${stage.stage}/${JOURNEY.length}: ${stage.title} — ${stage.cue}`;
+      banner.textContent = `${stage.stage}/${JOURNEY.length} · ${I18n.tx(stage, "title")} — ${I18n.tx(stage, "cue")}`;
       speak(stage.cue);
       if (i > 0) { Sensory.earcon("stage"); if (AppState.settings.haptics) Sensory.vibrate([60, 30, 60]); }
 

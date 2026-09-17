@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ClearPath — Volunteer</title>
+<meta name="theme-color" content="#0f1a14">
+<link rel="stylesheet" href="css/style.css">
+<style>
+  /* This page is for sighted volunteers, so it is styled for glanceability
+     rather than for the accessibility constraints the main app works under:
+     the person reading it is being asked to answer quickly. */
+  body { padding: 0 0 40px; }
+  .vol-wrap { max-width: 780px; margin: 0 auto; padding: 18px; }
+  .vol-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+  .vol-presence { font-size: .9rem; color: var(--muted); border: 1px solid var(--border); border-radius: 999px; padding: 4px 12px; }
+  .vol-presence[data-live="true"] { color: var(--accent); border-color: var(--accent); }
+  .vol-empty { color: var(--muted); padding: 28px 4px; }
+  .vol-req { border: 1px solid var(--border); border-inline-start: 5px solid var(--accent); border-radius: var(--radius-sm); background: var(--surface-raised); padding: 14px; margin-bottom: 12px; }
+  .vol-req[data-state="queued"] { border-inline-start-color: #c68a00; }
+  .vol-req[data-state="live"] { border-inline-start-color: #3b82f6; }
+  .vol-req[data-state="answered"], .vol-req[data-state="ended"] { opacity: .55; }
+  .vol-q { font-size: 1.1rem; margin: 0 0 8px; }
+  .vol-meta { font-size: .82rem; color: var(--muted); display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+  .vol-snap { max-width: 100%; border-radius: var(--radius-sm); border: 1px solid var(--border); margin-bottom: 10px; display: block; }
+  .vol-reply { width: 100%; min-height: 78px; padding: 10px 12px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--surface); color: var(--text); font: inherit; margin-bottom: 8px; }
+  .vol-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .vol-live { display: grid; gap: 10px; margin-top: 10px; }
+  .vol-live video { width: 100%; border-radius: var(--radius-sm); background: #000; border: 1px solid var(--border); }
+  .vol-lang { font-weight: 700; color: var(--accent); }
+</style>
+</head>
+<body data-contrast="normal">
+<div class="vol-wrap">
+  <div class="vol-head">
+    <div>
+      <h1 style="margin:0; font-size:1.5rem;">ClearPath · Volunteer</h1>
+      <p style="margin:4px 0 0; color:var(--muted);">Someone at Al Jahili Park is asking what's in front of them. Answer live, or type a reply.</p>
+    </div>
+    <span class="vol-presence" id="presence" data-live="false">connecting…</span>
+  </div>
+
+  <div id="list"><p class="vol-empty">No one is asking right now. Leave this page open — requests appear here.</p></div>
+</div>
+
+<audio id="chime" preload="auto"></audio>
+
+<script>
+(function () {
+  const list = document.getElementById("list");
+  const presence = document.getElementById("presence");
+  const requests = new Map();
+  const peers = new Map();
+
+  // A request arriving while the volunteer is looking elsewhere is the whole
+  // reason this page exists, so it makes a noise. WebAudio rather than a
+  // file, so there is nothing to ship.
+  let audio;
+  function chime() {
+    try {
+      audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+      [523.25, 659.25].forEach((f, i) => {
+        const o = audio.createOscillator(), g = audio.createGain();
+        o.type = "triangle"; o.frequency.value = f;
+        const at = audio.currentTime + i * 0.13;
+        g.gain.setValueAtTime(0.0001, at);
+        g.gain.exponentialRampToValueAtTime(0.14, at + 0.05);
+        g.gain.exponentialRampToValueAtTime(0.0001, at + 0.34);
+        o.connect(g).connect(audio.destination);
+        o.start(at); o.stop(at + 0.36);
+      });
+    } catch (_) {}
+  }
+
+  function esc(s) {
+    return String(s == null ? "" : s).replace(/[&<>"']/g, c =>
+      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  }
+
+  function render() {
+    const open = [...requests.values()].sort((a, b) => b.createdAt - a.createdAt);
+    if (!open.length) {
+      list.innerHTML = `<p class="vol-empty">No one is asking right now. Leave this page open — requests appear here.</p>`;
+      return;
+    }
+    list.innerHTML = open.map(r => `
+      <div class="vol-req" data-state="${esc(r.state)}" id="req-${esc(r.id)}">
+        <p class="vol-q">${esc(r.question) || "<em>No question given — they just want someone to look.</em>"}</p>
+        <div class="vol-meta">
+          <span>${new Date(r.createdAt).toLocaleTimeString()}</span>
+          <span>mode: ${esc(r.mode)}</span>
+          <span class="vol-lang">reply in ${r.lang === "ar" ? "ARABIC" : "ENGLISH"}</span>
+          <span>${esc(r.state)}</span>
+        </div>
+        ${r.snapshotUrl ? `<img class="vol-snap" src="${r.snapshotUrl}" alt="What they are pointing at">` : ""}
+        ${r.state === "live" ? `<div class="vol-live"><video id="vid-${esc(r.id)}" autoplay playsinline></video></div>` : ""}
+        ${(r.state === "ringing" || r.state === "queued") ? `
+          <div class="vol-actions">
+            ${r.state === "ringing" ? `<button class="btn primary" data-act="accept" data-id="${esc(r.id)}">Answer live</button>` : ""}
+            <button class="btn secondary" data-act="snap" data-id="${esc(r.id)}">Show photo</button>
+          </div>
+          <div style="margin-top:10px;">
+            <textarea class="vol-reply" id="reply-${esc(r.id)}" placeholder="${r.lang === "ar" ? "اكتب إجابتك بالعربية…" : "Type your answer…"}"></textarea>
+            <div class="vol-actions">
+              <button class="btn primary" data-act="send" data-id="${esc(r.id)}">Send answer</button>
+            </div>
+          </div>` : ""}
+        ${r.state === "live" ? `<div class="vol-actions"><button class="btn secondary" data-act="end" data-id="${esc(r.id)}">End call</button></div>` : ""}
+        ${r.answer ? `<p style="color:var(--accent); margin-top:8px;">Answered: ${esc(r.answer)}</p>` : ""}
+      </div>`).join("");
+  }
+
+  list.addEventListener("click", async (e) => {
+    const btn = e.target.closest("button[data-act]");
+    if (!btn) return;
+    const id = btn.dataset.id;
+    const r = requests.get(id);
+    if (!r) return;
+
+    if (btn.dataset.act === "snap") {
+      const res = await fetch(`/api/volunteer/snapshot?id=${encodeURIComponent(id)}`);
+      if (res.ok) { r.snapshotUrl = (await res.json()).snapshot; render(); }
+      return;
+    }
+    if (btn.dataset.act === "accept") {
+      const res = await fetch("/api/volunteer/accept", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id })
+      });
+      if (!res.ok) { alert("Another volunteer already took this one."); return; }
+      r.state = "live"; render();
+      return;
+    }
+    if (btn.dataset.act === "send") {
+      const answer = document.getElementById(`reply-${id}`).value.trim();
+      if (!answer) return;
+      await fetch("/api/volunteer/answer", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, answer })
+      });
+      return;
+    }
+    if (btn.dataset.act === "end") {
+      const pc = peers.get(id);
+      if (pc) { try { pc.close(); } catch (_) {} peers.delete(id); }
+      await fetch("/api/volunteer/end", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id })
+      });
+    }
+  });
+
+  /* ── Signalling ──
+     The visitor always makes the offer, because they are the one with the
+     camera; this side only ever answers. Media is peer to peer — the server
+     relays nothing but the handshake. */
+  async function onSignal(id, signal) {
+    let pc = peers.get(id);
+    if (!pc) {
+      pc = new RTCPeerConnection({ iceServers: [{ urls: "stun:stun.l.google.com:19302" }] });
+      peers.set(id, pc);
+      pc.ontrack = (e) => {
+        const v = document.getElementById(`vid-${id}`);
+        if (v) v.srcObject = e.streams[0];
+      };
+      pc.onicecandidate = (e) => {
+        if (e.candidate) send(id, e.candidate.toJSON());
+      };
+    }
+    if (signal.type === "offer") {
+      await pc.setRemoteDescription(signal);
+      const answer = await pc.createAnswer();
+      await pc.setLocalDescription(answer);
+      send(id, answer);
+    } else if (signal.candidate) {
+      try { await pc.addIceCandidate(signal); } catch (_) {}
+    }
+  }
+
+  function send(id, signal) {
+    fetch("/api/volunteer/signal", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, from: "volunteer", signal })
+    }).catch(() => {});
+  }
+
+  const es = new EventSource("/api/volunteer/events?role=volunteer");
+  es.onopen = () => { presence.textContent = "listening for requests"; presence.dataset.live = "true"; };
+  es.onerror = () => { presence.textContent = "disconnected — retrying"; presence.dataset.live = "false"; };
+
+  es.addEventListener("presence", (e) => {
+    const n = JSON.parse(e.data).online;
+    presence.textContent = `${n} volunteer${n === 1 ? "" : "s"} listening`;
+    presence.dataset.live = "true";
+  });
+  es.addEventListener("request", (e) => {
+    const r = JSON.parse(e.data);
+    if (!requests.has(r.id)) chime();
+    requests.set(r.id, { ...requests.get(r.id), ...r });
+    render();
+  });
+  es.addEventListener("updated", (e) => {
+    const r = JSON.parse(e.data);
+    requests.set(r.id, { ...requests.get(r.id), ...r });
+    render();
+  });
+  es.addEventListener("expired", (e) => {
+    requests.delete(JSON.parse(e.data).id);
+    render();
+  });
+  es.addEventListener("signal", (e) => {
+    const { id, signal } = JSON.parse(e.data);
+    onSignal(id, signal);
+  });
+})();
+</script>
+</body>
+</html>

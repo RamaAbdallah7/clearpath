@@ -78,10 +78,21 @@ cp .env.example .env && node server/proxy.mjs
 |---|---|---|
 | `OPENROUTER_API_KEY` | Personalised stage cues | Written cues — nothing breaks |
 | `ORS_API_KEY` | OpenRouteService wheelchair routing profile | Keyless Valhalla pedestrian routing |
-| `GOOGLE_MAPS_SERVER_KEY` | "What am I looking at?" scene descriptions | Written descriptions, clearly labelled |
 
-The Visit screen's 360° viewer uses a **separate** key you paste into the UI, which only needs the
-free Maps Embed API. It's stored in your browser and never sent anywhere except Google.
+**There is no Google key, and no map key at all.** Every geospatial service ClearPath uses is free and
+keyless:
+
+| Service | Provider | Key needed |
+|---|---|---|
+| Map tiles | OpenStreetMap | none |
+| Pedestrian routing | Valhalla (OSM community server) | none |
+| Accessible facilities | Overpass API | none |
+| Place names | Nominatim | none |
+
+Street View was used at first and dropped. The keyless alternatives were checked rather than assumed:
+Panoramax returns zero features for the park's bounding box, and Mapillary refuses queries without an
+OAuth token and shows no captures there. So the Visit screen runs on the site's own photographs, which
+also means it works offline.
 
 ### On your phone
 

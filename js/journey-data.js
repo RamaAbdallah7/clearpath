@@ -14,6 +14,9 @@ const PARK_ANCHOR = { lat: 24.2187989, lng: 55.7535982 };
 // Used to tell "inside the park" from "still on the approach roads".
 const PARK_BBOX = { south: 24.2146431, west: 55.7509935, north: 24.2201838, east: 55.7562645 };
 
+// Each stage carries an `ar` block with the Arabic of its reader-facing
+// fields. i18n.tx(stage, "cue") picks the right one; anything not translated
+// falls back to English rather than rendering blank.
 const JOURNEY = [
   {
     id: "parking",
@@ -33,7 +36,12 @@ const JOURNEY = [
     lighting: true,
     description: "You're at the parking area east of the park. Look for the marked accessible bay closest to the footpath — the kerb is dropped at the aisle end.",
     cue: "Starting point. Head west toward the park gate, about two hundred metres.",
-    photo: "assets/photos/001-thumb.jpg"
+    photo: "assets/photos/001-thumb.jpg",
+    ar: {
+      title: "موقف السيارات",
+      description: "أنت في موقف السيارات شرق الحديقة. ابحث عن الموقف المخصّص الأقرب إلى الممشى — الرصيف منخفض عند طرف الممر.",
+      cue: "نقطة البداية. اتجه غرباً نحو بوابة الحديقة، على بُعد مئتي متر تقريباً."
+    }
   },
   {
     id: "entrance",
@@ -51,7 +59,12 @@ const JOURNEY = [
     lighting: true,
     description: "This is the east gate into the park. It is step-free and wide enough for a wheelchair. There's a bench just inside if you'd like to rest before continuing.",
     cue: "You have reached the east gate. It is step-free. A seating area is just inside on your right.",
-    photo: "assets/photos/002-thumb.jpg"
+    photo: "assets/photos/002-thumb.jpg",
+    ar: {
+      title: "المدخل",
+      description: "هذه هي البوابة الشرقية للحديقة. خالية من الدرجات وواسعة بما يكفي لمرور كرسي متحرك. يوجد مقعد بالداخل مباشرة إن أردت الاستراحة قبل المتابعة.",
+      cue: "وصلت إلى البوابة الشرقية. لا توجد درجات. منطقة الجلوس على يمينك بالداخل مباشرة."
+    }
   },
   {
     id: "internal-paths",
@@ -72,7 +85,12 @@ const JOURNEY = [
     lighting: true,
     description: "The main internal walkway. Mostly step-free with good tree shade. One short section has uneven paving — keep to the left side.",
     cue: "Continue straight on the shaded walkway. Uneven paving ahead on the right, keep left.",
-    photo: "assets/photos/003-thumb.jpg"
+    photo: "assets/photos/003-thumb.jpg",
+    ar: {
+      title: "الممرات الداخلية",
+      description: "الممشى الداخلي الرئيسي. خالٍ من الدرجات في معظمه وظليل بالأشجار. يوجد مقطع قصير ببلاط غير مستوٍ — التزم الجهة اليسرى.",
+      cue: "واصل السير مباشرة على الممشى الظليل. بلاط غير مستوٍ أمامك على اليمين، التزم اليسار."
+    }
   },
   {
     id: "seating-shade",
@@ -91,7 +109,12 @@ const JOURNEY = [
     lighting: true,
     description: "A shaded rest area. The accessible toilets here are step-free, free to use, and have a changing table.",
     cue: "Shaded seating on your left. Step-free accessible toilets are right beside you.",
-    photo: "assets/photos/004-thumb.jpg"
+    photo: "assets/photos/004-thumb.jpg",
+    ar: {
+      title: "الجلوس والظل",
+      description: "منطقة استراحة ظليلة. دورات المياه هنا مهيّأة لذوي الهمم، خالية من الدرجات، مجانية، وبها طاولة تغيير.",
+      cue: "مقاعد ظليلة على يسارك. دورات مياه مهيّأة وخالية من الدرجات بجانبك مباشرة."
+    }
   },
   {
     id: "park-use",
@@ -109,7 +132,12 @@ const JOURNEY = [
     lighting: true,
     description: "You've arrived at the playground and open lawn. The approach path is paved; the play area itself is sand. Enjoy your visit!",
     cue: "You have arrived. The approach is paved, the play area is sand. Enjoy the park.",
-    photo: "assets/photos/005-thumb.jpg"
+    photo: "assets/photos/005-thumb.jpg",
+    ar: {
+      title: "الاستمتاع بالحديقة",
+      description: "وصلت إلى منطقة الألعاب والمساحة الخضراء. ممر الوصول مرصوف، أما منطقة اللعب نفسها فرملية. استمتع بزيارتك!",
+      cue: "لقد وصلت. الممر مرصوف ومنطقة اللعب رملية. استمتع بالحديقة."
+    }
   }
 ];
 

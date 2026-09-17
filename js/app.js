@@ -83,9 +83,16 @@ function setLanguage(arabic) {
   document.documentElement.lang = arabic ? "ar" : "en";
   document.documentElement.dir = arabic ? "rtl" : "ltr";
   document.querySelectorAll("#tabbar button span").forEach(span => {
+    if (span.dataset.i18n) return;              // i18n.apply owns these
     if (!span.dataset.en) span.dataset.en = span.textContent;
     span.textContent = arabic ? (AR_LABELS[span.dataset.en] || span.dataset.en) : span.dataset.en;
   });
+  // Re-render every translatable string, then let the screens that hold
+  // their own content (assist, story, visit) redraw in the new language.
+  if (window.I18n) I18n.apply();
+  window.dispatchEvent(new CustomEvent("clearpath:language", { detail: { lang: arabic ? "ar" : "en" } }));
+  if (window.ClearPathMap && AppState.screen === "journey") ClearPathMap.refresh();
+  renderStageList();
 }
 
 function setTextScale(scale) {
@@ -194,6 +201,11 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   });
 
+  // An Arabic-speaking visitor should not have to find a toggle before the
+  // app becomes readable, so the browser's own language decides the default.
+  if (window.I18n && I18n.detect()) setLanguage(true);
+  else I18n.apply();
+
   renderStageList();
   populateReportStageSelect();
 });
@@ -216,8 +228,8 @@ function renderStageList() {
     li.innerHTML = `
       <img src="${stage.photo}" alt="" />
       <div class="stage-info">
-        <strong>${stage.stage}. ${stage.title}</strong>
-        <p style="margin:4px 0; color:var(--muted); font-size:0.95rem;">${stage.description}</p>
+        <strong>${stage.stage}. ${I18n.tx(stage, "title")}</strong>
+        <p style="margin:4px 0; color:var(--muted); font-size:0.95rem;">${I18n.tx(stage, "description")}</p>
         <p class="stage-provenance">${stage.osm}</p>
       </div>
       <span class="score-pill ${scoreClass(score)}" title="${breakdown}">${score}%</span>
