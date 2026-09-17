@@ -1,6 +1,5 @@
 (function () {
   let stream = null;
-  let watchId = null;
   let currentPos = null;
   let currentHeading = null;
   let mode = "idle"; // idle | live | classroom | trip
@@ -33,24 +32,10 @@
   // arrow sweep through a realistic range.
   const CLASSROOM_TARGET_BEARINGS = [35, 120, 205, 265, 330];
 
-  function toRad(d) { return d * Math.PI / 180; }
-  function toDeg(r) { return r * 180 / Math.PI; }
-
-  function bearingTo(from, to) {
-    const y = Math.sin(toRad(to.lng - from.lng)) * Math.cos(toRad(to.lat));
-    const x = Math.cos(toRad(from.lat)) * Math.sin(toRad(to.lat)) -
-      Math.sin(toRad(from.lat)) * Math.cos(toRad(to.lat)) * Math.cos(toRad(to.lng - from.lng));
-    return (toDeg(Math.atan2(y, x)) + 360) % 360;
-  }
-
-  function distanceMeters(from, to) {
-    const R = 6371000;
-    const dLat = toRad(to.lat - from.lat);
-    const dLng = toRad(to.lng - from.lng);
-    const a = Math.sin(dLat / 2) ** 2 +
-      Math.cos(toRad(from.lat)) * Math.cos(toRad(to.lat)) * Math.sin(dLng / 2) ** 2;
-    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  }
+  // Bearing and distance now live in geo.js, so the map, the AR arrow and
+  // the geofence engine all measure with exactly the same maths.
+  const bearingTo = (from, to) => Geo.bearingTo(from, to);
+  const distanceMeters = (from, to) => Geo.distanceMeters(from, to);
 
   function currentTarget() {
     return JOURNEY[Math.min(AppState.currentStageIndex, JOURNEY.length - 1)];
@@ -71,17 +56,50 @@
   }
 
   function advanceStage(finalMessage) {
-    speak(currentTarget().cue);
+    const stage = currentTarget();
+    const fix = Geo.fix;
+    // Hand the cue writer everything we actually know right now, so a
+    // personalised cue can mention the real distance and the real GPS
+    // quality instead of being a generic rewrite of the written line.
+    ClearPathAI.speakStage(stage, {
+      distance: fix && Geo.isUsable(fix) ? Math.round(distanceMeters(fix, stage)) : null,
+      gpsQuality: Geo.quality().text
+    });
     if (AppState.settings.haptics) Sensory.vibrate([70, 40, 70]);
     if (AppState.currentStageIndex < JOURNEY.length - 1) {
       Sensory.earcon("stage");
       AppState.currentStageIndex++;
       renderStageList();
       renderProgress();
+      if (window.ClearPathARPath) ClearPathARPath.retarget();
     } else {
       Sensory.earcon("arrive");
       if (AppState.settings.haptics) Sensory.vibrate([100, 60, 100, 60, 180]);
       if (finalMessage) setTimeout(finalMessage, 300);
+    }
+  }
+
+  /* ── GPS honesty panel ──
+     Says out loud how much the app actually knows. A visitor who cannot see
+     the gate is trusting this voice completely, so "GPS too weak to guide"
+     has to be sayable. */
+  function renderGpsPanel() {
+    const q = Geo.quality();
+    const dot = document.getElementById("gpsDot");
+    const label = document.getElementById("gpsQuality");
+    const detail = document.getElementById("gpsDetail");
+    if (!dot) return;
+    dot.dataset.level = q.level;
+    label.textContent = q.text;
+
+    const fix = Geo.fix;
+    if (!fix) {
+      detail.textContent = "Live mode uses real satellite positioning. Stages only advance on a fix accurate enough to trust.";
+    } else if (q.level === "poor" || q.level === "stale") {
+      detail.textContent = `Holding position at stage ${currentTarget().stage}. I won't announce an arrival on a fix this vague — use the manual heading slider, or ask someone nearby.`;
+    } else {
+      const d = Math.round(distanceMeters(fix, currentTarget()));
+      detail.textContent = `${d} m to ${currentTarget().title}. Arrival announces inside ${Math.round(currentTarget().radius)} m.`;
     }
   }
 
@@ -90,10 +108,15 @@
     let pos, heading, bearing, dist;
 
     if (mode === "live") {
-      pos = currentPos || { lat: JOURNEY[0].lat - 0.0006, lng: JOURNEY[0].lng - 0.0005 };
+      // No invented fallback position. The old code substituted a point ~80 m
+      // south-west of stage 1 whenever GPS was missing, which produced a
+      // confident arrow and a specific distance out of nothing at all — the
+      // single most dangerous thing this screen could do to someone who
+      // can't see the gate and is trusting it.
+      pos = currentPos;
       heading = manualHeading != null ? manualHeading : (currentHeading ?? 0);
-      bearing = bearingTo(pos, { lat: target.lat, lng: target.lng });
-      dist = Math.round(distanceMeters(pos, { lat: target.lat, lng: target.lng }));
+      bearing = pos ? bearingTo(pos, { lat: target.lat, lng: target.lng }) : null;
+      dist = pos ? Math.round(distanceMeters(pos, { lat: target.lat, lng: target.lng })) : null;
     } else if (mode === "classroom") {
       heading = currentHeading != null ? currentHeading : (manualHeading ?? 0);
       bearing = CLASSROOM_TARGET_BEARINGS[AppState.currentStageIndex] ?? 0;
@@ -102,18 +125,26 @@
       return;
     }
 
-    const relative = ((bearing - heading) + 360) % 360;
-    arrow.style.transform = `rotate(${relative}deg)`;
+    // With no bearing there is nothing honest to point at, so the arrow is
+    // hidden rather than left pointing somewhere arbitrary.
+    const relative = bearing != null ? ((bearing - heading) + 360) % 360 : null;
+    arrow.style.opacity = relative == null ? "0.25" : "1";
+    if (relative != null) arrow.style.transform = `rotate(${relative}deg)`;
     banner.textContent = `Stage ${target.stage}/${JOURNEY.length}: ${target.title} — ${target.cue}`;
 
     if (mode === "live") {
-      distanceEl.textContent = `${dist} m ahead`;
-      status.textContent = currentPos ? `GPS locked · heading ${Math.round(heading)}°` : "Waiting for GPS — use manual heading below";
-      if (AppState.settings.beacon) Sensory.beaconSetDistance(dist);
-      if (dist < 15 && lastAnnouncedStage !== AppState.currentStageIndex) {
-        lastAnnouncedStage = AppState.currentStageIndex;
-        advanceStage(null);
-      }
+      const q = Geo.quality();
+      distanceEl.textContent = dist != null ? `${dist} m ahead` : "distance unknown";
+      status.textContent = currentPos
+        ? `${q.text} · heading ${Math.round(heading)}°`
+        : "Waiting for GPS — use manual heading below";
+      // The beacon translates distance into chime rate. Feeding it a
+      // distance derived from an untrustworthy fix would make it lie in a
+      // channel the visitor can't sanity-check, so it only runs on a fix
+      // we'd act on.
+      if (AppState.settings.beacon && Geo.isUsable(Geo.fix)) Sensory.beaconSetDistance(dist);
+      // Stage advancement is NOT decided here any more — geo.js fires
+      // onEnter once a fence is genuinely satisfied. See startLive().
     } else if (mode === "classroom") {
       const off = Math.round(Math.min(relative, 360 - relative));
       distanceEl.textContent = off < 15 ? "Facing it!" : `${off}° to turn`;
@@ -161,25 +192,52 @@
     }
   }
 
+  // Wired once, not per-start, so repeated Live sessions don't stack
+  // duplicate listeners and announce every arrival twice.
+  let geoWired = false;
+  function wireGeo() {
+    if (geoWired) return;
+    geoWired = true;
+
+    Geo.onFix((fix) => {
+      if (fix) { currentPos = { lat: fix.lat, lng: fix.lng }; if (fix.heading != null) currentHeading = fix.heading; }
+      renderGpsPanel();
+      if (window.ClearPathMap) ClearPathMap.showLiveFix(fix || Geo.fix);
+    });
+
+    // The geofence has already applied accuracy gating, hysteresis and a
+    // dwell requirement by the time this fires, so an arrival here is one
+    // we're willing to say out loud.
+    Geo.onEnter((stage) => {
+      if (mode !== "live") return;
+      if (stage.stage - 1 !== AppState.currentStageIndex) return;
+      if (lastAnnouncedStage === AppState.currentStageIndex) return;
+      lastAnnouncedStage = AppState.currentStageIndex;
+      advanceStage(() => {
+        speak("That's the full route. You've arrived.");
+        stopAll();
+      });
+    });
+  }
+
   async function startLive() {
     stopAll(true);
     video.hidden = false;
     await startCamera("environment");
     await requestOrientation();
 
-    if (navigator.geolocation) {
-      watchId = navigator.geolocation.watchPosition(
-        (p) => { currentPos = { lat: p.coords.latitude, lng: p.coords.longitude }; },
-        () => {},
-        { enableHighAccuracy: true, maximumAge: 2000 }
-      );
+    wireGeo();
+    if (!Geo.start() && !Geo.isRunning) {
+      status.textContent = "Geolocation unavailable — try the Simulated Trip or Classroom demo.";
     }
 
     mode = "live";
+    lastAnnouncedStage = -1;
     setBadge("Live", "live");
     setButtons({ start: true, classroom: true, trip: true, stop: false });
     renderProgress();
-    speak(`Starting navigation. ${currentTarget().cue}`);
+    renderGpsPanel();
+    ClearPathAI.speakStage(currentTarget(), { gpsQuality: Geo.quality().text });
     loop();
   }
 
@@ -277,7 +335,9 @@
 
   function stopSensors() {
     if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
-    if (watchId) { navigator.geolocation.clearWatch(watchId); watchId = null; }
+    Geo.stop();
+    if (window.ClearPathVision && ClearPathVision.isRunning) ClearPathVision.stop();
+    if (window.ClearPathARPath && ClearPathARPath.isRunning) ClearPathARPath.stop();
     window.removeEventListener("deviceorientationabsolute", onOrientation, true);
     window.removeEventListener("deviceorientation", onOrientation, true);
     Sensory.beaconStop();
@@ -327,6 +387,97 @@
   classroomNextBtn.addEventListener("click", classroomAdvance);
   stopBtn.addEventListener("click", () => stopAll());
 
+  /* ── Obstacle detection ─────────────────────────────────────────────
+     Opt-in, because it downloads a model and runs it on every frame. It
+     only makes sense over a live camera, so the toggle says so rather than
+     silently doing nothing during the Simulated Trip. */
+  const visionToggle = document.getElementById("visionToggle");
+  const visionControls = document.getElementById("visionControls");
+  const visionStatus = document.getElementById("visionStatus");
+  const visionThreshold = document.getElementById("visionThreshold");
+  const visionThresholdVal = document.getElementById("visionThresholdVal");
+  const visionCanvas = document.getElementById("arVisionCanvas");
+  const obstacleLog = document.getElementById("obstacleLog");
+  const obstacleLogList = document.getElementById("obstacleLogList");
+
+  function setVisionStatus(text, kind) {
+    visionStatus.textContent = text;
+    visionStatus.dataset.kind = kind || "idle";
+  }
+
+  visionToggle.addEventListener("change", async (e) => {
+    const on = e.target.checked;
+    visionControls.hidden = !on;
+    if (!on) {
+      if (window.ClearPathVision) ClearPathVision.stop();
+      visionCanvas.hidden = true;
+      return;
+    }
+    if (!window.ClearPathVision) {
+      setVisionStatus("Detector still loading — try again in a moment", "error");
+      return;
+    }
+    if (mode !== "live" && mode !== "classroom") {
+      setVisionStatus("Start Live or Classroom first — this needs the camera", "error");
+      speak("Obstacle alerts need the camera. Start Live or the Classroom demo first.");
+      return;
+    }
+    visionCanvas.hidden = false;
+    obstacleLog.hidden = false;
+    ClearPathVision.setThreshold(visionThreshold.value);
+    await ClearPathVision.start(video, visionCanvas, setVisionStatus);
+  });
+
+  /* ── Ground path line ──
+     Needs a live camera AND a trustworthy GPS fix AND a heading. If any of
+     the three is missing, arpath.js draws nothing and says why, rather
+     than painting a line somebody would follow into a flowerbed. */
+  const pathToggle = document.getElementById("pathToggle");
+  const pathLegend = document.getElementById("arPathLegend");
+  pathToggle.addEventListener("change", (e) => {
+    const on = e.target.checked;
+    pathLegend.hidden = !on;
+    if (!on) { ClearPathARPath.stop(); return; }
+    if (mode !== "live") {
+      speak("The path line needs Live mode, so it can see where you really are.");
+      toast("Start Live (GPS) first");
+      e.target.checked = false;
+      pathLegend.hidden = true;
+      return;
+    }
+    ClearPathARPath.start();
+  });
+
+  visionThreshold.addEventListener("input", (e) => {
+    visionThresholdVal.textContent = Number(e.target.value).toFixed(2);
+    if (window.ClearPathVision) ClearPathVision.setThreshold(e.target.value);
+  });
+
+  // A running visual record of what was announced. Deaf and hard-of-hearing
+  // visitors get the same alerts the speech channel carries — the workshop
+  // deck is explicit that an audio-only alert is itself a barrier.
+  window.addEventListener("clearpath:obstacle", (e) => {
+    const li = document.createElement("li");
+    li.className = "obstacle-" + e.detail.meaning.sev;
+    li.innerHTML = `<span class="obstacle-time">${new Date().toLocaleTimeString()}</span> ${e.detail.text}`;
+    obstacleLogList.prepend(li);
+    while (obstacleLogList.children.length > 8) obstacleLogList.lastChild.remove();
+  });
+
   renderProgress();
-  window.ClearPathAR = { startLive, startDemo: startTrip, startTrip, startClassroom, stop: () => stopAll() };
+  // arpath.js needs whatever heading we actually have: the real compass if
+  // the device has one, otherwise the manual slider. Returns null rather
+  // than 0 when we have neither, so the path overlay can refuse to draw
+  // instead of confidently painting a line pointing due north.
+  window.ClearPathHeading = function () {
+    if (orientationSupported && currentHeading != null) return currentHeading;
+    if (manualHeading != null) return manualHeading;
+    return null;
+  };
+
+  window.ClearPathAR = {
+    startLive, startDemo: startTrip, startTrip, startClassroom,
+    stop: () => stopAll(),
+    get mode() { return mode; }
+  };
 })();

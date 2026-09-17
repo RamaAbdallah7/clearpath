@@ -5,7 +5,7 @@ const AppState = {
   contrast: false,
   isArabic: false,
   textScale: 1,
-  settings: { beacon: false, haptics: true, audioFirst: false }
+  settings: { beacon: false, haptics: true, audioFirst: false, aiCues: false }
 };
 
 function announce(text) {
@@ -76,7 +76,7 @@ function setContrast(on) {
 
 const AR_LABELS = {
   Home: "الرئيسية", Map: "الخريطة", AR: "الواقع المعزز",
-  Story: "القصة", Report: "الإبلاغ", "Hands-Free": "بدون لمس"
+  Visit: "زيارة", Story: "القصة", Report: "الإبلاغ", "Hands-Free": "بدون لمس"
 };
 function setLanguage(arabic) {
   AppState.isArabic = arabic;
@@ -149,6 +149,24 @@ document.addEventListener("DOMContentLoaded", () => {
     toast(on ? "Haptic pulses on" : "Haptic pulses off");
   });
 
+  // Personalised cues. The status line tells the truth about whether the
+  // proxy is actually reachable, so nobody demos this believing it is on
+  // when it has been silently falling back to the written text all along.
+  const aiStatusEl = document.getElementById("aiStatus");
+  document.getElementById("aiToggle").addEventListener("click", async (e) => {
+    const on = e.currentTarget.getAttribute("aria-checked") !== "true";
+    AppState.settings.aiCues = on;
+    setSwitch(e.currentTarget, on);
+    ClearPathAI.setEnabled(on);
+    if (!on) { aiStatusEl.textContent = "off"; aiStatusEl.dataset.state = "off"; return; }
+    aiStatusEl.textContent = "checking…";
+    aiStatusEl.dataset.state = "checking";
+    const ok = await ClearPathAI.probe();
+    aiStatusEl.textContent = ok ? "proxy connected" : "proxy not running — using written cues";
+    aiStatusEl.dataset.state = ok ? "ok" : "fallback";
+    toast(ok ? "Personalised cues on" : "Proxy not running — written cues will be used");
+  });
+
   const audioFirst = document.getElementById("audioFirstToggle");
   audioFirst.addEventListener("change", (e) => {
     AppState.settings.audioFirst = e.target.checked;
@@ -193,13 +211,16 @@ function renderStageList() {
     const score = confidenceScore(stage);
     const li = document.createElement("li");
     li.className = "stage-item" + (idx === AppState.currentStageIndex ? " current" : "");
+    const breakdown = confidenceBreakdown(stage)
+      .map(b => `${b.label} ${b.earned}/${b.max}`).join(" · ");
     li.innerHTML = `
       <img src="${stage.photo}" alt="" />
       <div class="stage-info">
         <strong>${stage.stage}. ${stage.title}</strong>
         <p style="margin:4px 0; color:var(--muted); font-size:0.95rem;">${stage.description}</p>
+        <p class="stage-provenance">${stage.osm}</p>
       </div>
-      <span class="score-pill ${scoreClass(score)}">${score}%</span>
+      <span class="score-pill ${scoreClass(score)}" title="${breakdown}">${score}%</span>
     `;
     list.appendChild(li);
   });

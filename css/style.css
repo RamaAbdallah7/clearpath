@@ -681,3 +681,399 @@ video.headcam-preview {
   transform: translate(-50%, -50%);
   pointer-events: none;
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+   Real-GPS, obstacle-detection and personalised-cue additions
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ── Route summary ──────────────────────────────────────────────── */
+.route-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  align-items: center;
+  margin-top: 12px;
+  padding: 12px 14px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+.route-stat { color: var(--muted); font-size: 0.95rem; }
+.route-stat strong { color: var(--text); font-size: 1.15rem; }
+.route-provider {
+  margin-inline-start: auto;
+  font-size: 0.82rem;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 3px 10px;
+}
+/* A degraded route is a straight line pretending to be guidance. It gets
+   a warning colour so nobody demos it thinking the router worked. */
+.route-provider.degraded { color: var(--warn); border-color: var(--warn); }
+
+.map-note {
+  margin: 10px 0 0;
+  font-size: 0.82rem;
+  color: var(--muted);
+  word-break: break-word;
+}
+
+.stage-provenance {
+  margin: 2px 0 0;
+  font-size: 0.78rem;
+  color: var(--muted);
+  opacity: 0.75;
+  font-style: italic;
+}
+
+.btn.small { padding: 8px 14px; font-size: 0.9rem; min-height: 40px; }
+
+/* ── Nearby facilities ──────────────────────────────────────────── */
+.places-list { list-style: none; margin: 12px 0 0; padding: 0; }
+.place-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  margin-bottom: 8px;
+  background: var(--surface-raised);
+  /* A left rail carries the wheelchair tag, so the accessibility answer is
+     legible at a glance and not only in the text. */
+  border-inline-start: 5px solid var(--border);
+}
+.place-item.wc-yes { border-inline-start-color: var(--accent); }
+.place-item.wc-limited { border-inline-start-color: #c68a00; }
+.place-item.wc-no { border-inline-start-color: var(--warn); }
+.place-item.wc-unknown { border-inline-start-color: var(--muted); }
+.place-icon { font-size: 1.4rem; line-height: 1; }
+.place-body { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.place-note { font-size: 0.85rem; color: var(--muted); }
+.place-dist {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.places-empty { color: var(--muted); padding: 12px 0; list-style: none; }
+
+/* ── Obstacle detection overlay ─────────────────────────────────── */
+.ar-vision-overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.vision-controls { gap: 10px; }
+.vision-controls input[type="range"] { flex: 1; min-width: 120px; }
+.vision-threshold-val {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  min-width: 3.2ch;
+}
+.vision-status {
+  font-size: 0.85rem;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 3px 10px;
+}
+.vision-status[data-kind="live"] { color: var(--accent); border-color: var(--accent); }
+.vision-status[data-kind="error"] { color: var(--warn); border-color: var(--warn); }
+
+/* ── GPS honesty panel ──────────────────────────────────────────── */
+.gps-panel {
+  margin-top: 14px;
+  padding: 12px 14px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+.gps-row { display: flex; align-items: center; gap: 10px; }
+.gps-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex: none;
+  background: var(--muted);
+  /* Colour alone never carries the state — the text beside it always says
+     the same thing in words. */
+  border: 2px solid var(--border);
+}
+.gps-dot[data-level="good"] { background: var(--accent); }
+.gps-dot[data-level="fair"] { background: #c68a00; }
+.gps-dot[data-level="poor"],
+.gps-dot[data-level="stale"] { background: var(--warn); }
+.gps-detail { margin: 8px 0 0; font-size: 0.88rem; color: var(--muted); }
+
+/* ── Obstacle log ───────────────────────────────────────────────── */
+.obstacle-log {
+  margin-top: 14px;
+  padding: 12px 14px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+.obstacle-log h3 { margin: 0 0 8px; font-size: var(--step-h3); }
+.obstacle-log ul { list-style: none; margin: 0; padding: 0; }
+.obstacle-log li {
+  padding: 8px 10px;
+  border-inline-start: 4px solid var(--border);
+  background: var(--surface);
+  border-radius: var(--radius-sm);
+  margin-bottom: 6px;
+  font-size: 0.92rem;
+}
+.obstacle-log li.obstacle-block { border-inline-start-color: var(--warn); }
+.obstacle-log li.obstacle-caution { border-inline-start-color: #c68a00; }
+.obstacle-log li.obstacle-amenity { border-inline-start-color: var(--accent); }
+.obstacle-time {
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  font-size: 0.8rem;
+  margin-inline-end: 6px;
+}
+
+/* ── AI cue status ──────────────────────────────────────────────── */
+.ai-status {
+  display: inline-block;
+  font-size: 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 2px 9px;
+  color: var(--muted);
+}
+.ai-status[data-state="ok"] { color: var(--accent); border-color: var(--accent); }
+.ai-status[data-state="fallback"] { color: var(--warn); border-color: var(--warn); }
+
+@media (max-width: 520px) {
+  .route-provider { margin-inline-start: 0; }
+  .place-item { flex-wrap: wrap; }
+}
+
+/* ── Ground path overlay ────────────────────────────────────────── */
+.ar-path-overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  /* Under the obstacle boxes and the arrow: the path is the ground layer,
+     the warnings sit on top of it. */
+  z-index: 2;
+}
+.ar-path-hint {
+  position: absolute;
+  left: 50%;
+  bottom: 84px;
+  transform: translateX(-50%);
+  max-width: 80%;
+  text-align: center;
+  background: rgba(8, 20, 14, 0.82);
+  color: #fff;
+  border: 1px solid rgba(255,255,255,0.18);
+  border-radius: 999px;
+  padding: 7px 14px;
+  font-size: 0.85rem;
+  z-index: 5;
+}
+.ar-path-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 14px;
+  margin: 10px 0 0;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+.legend-swatch {
+  display: inline-block;
+  width: 22px;
+  height: 10px;
+  border-radius: 3px;
+  margin-inline-end: 2px;
+  vertical-align: middle;
+}
+.legend-swatch[data-c="green"]  { background: #22c55e; }
+.legend-swatch[data-c="yellow"] { background: #facc15; }
+.legend-swatch[data-c="red"]    { background: #ef4444; }
+
+/* ── Virtual visit (Street View) ────────────────────────────────── */
+.sv-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 14px 0 12px;
+}
+.sv-chip {
+  appearance: none;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.9rem;
+  color: var(--text);
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 9px 15px;
+  /* 44px minimum tap target, same rule as the rest of the app. */
+  min-height: 44px;
+  border-inline-start-width: 5px;
+}
+.sv-chip.kind-journey   { border-inline-start-color: var(--accent); }
+.sv-chip.kind-highlight { border-inline-start-color: #7c9cff; }
+.sv-chip.kind-service   { border-inline-start-color: #c68a00; }
+.sv-chip.kind-emergency { border-inline-start-color: var(--warn); }
+.sv-chip.active {
+  background: var(--accent-strong);
+  color: #fff;
+  border-color: var(--accent);
+  font-weight: 700;
+}
+.sv-chip:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+
+.sv-stage {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: #0a1410;
+  border: 1px solid var(--border);
+}
+.sv-stage iframe { width: 100%; height: 100%; border: 0; display: block; }
+
+.sv-keyprompt { padding: 20px; }
+.sv-keyprompt h3 { margin-top: 0; }
+.sv-keyprompt ol { margin: 10px 0 14px; padding-inline-start: 20px; color: var(--muted); }
+.sv-keyprompt li { margin-bottom: 6px; }
+.sv-keyprompt input {
+  flex: 1;
+  min-width: 180px;
+  min-height: 44px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+}
+.sv-fallback-note { color: var(--muted); font-size: 0.88rem; margin-bottom: 0; }
+.linklike {
+  appearance: none;
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  color: var(--accent);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.sv-blurb { margin-top: 4px; }
+.sv-coverage {
+  font-size: 0.8rem;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 3px 10px;
+  display: inline-block;
+}
+.sv-panel {
+  margin-top: 12px;
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-inline-start: 5px solid var(--border);
+}
+.sv-panel h4 { margin: 0 0 6px; font-size: 1rem; }
+.sv-panel p { margin: 0; color: var(--muted); }
+.sv-panel.good { border-inline-start-color: var(--accent); }
+.sv-panel.caution { border-inline-start-color: #c68a00; }
+.sv-panel.emergency { border-inline-start-color: var(--warn); }
+.sv-services { margin: 0; padding-inline-start: 20px; color: var(--muted); }
+.sv-services li { margin-bottom: 3px; }
+
+.sv-exits { list-style: none; margin: 12px 0 0; padding: 0; }
+.sv-exits li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 11px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  margin-bottom: 7px;
+  background: var(--surface-raised);
+}
+.sv-exits span { color: var(--muted); font-variant-numeric: tabular-nums; font-size: 0.85rem; }
+
+@media (max-width: 520px) {
+  .sv-stage { aspect-ratio: 4 / 3; }
+}
+
+/* ── Street View AI guide ───────────────────────────────────────── */
+.sv-controls {
+  position: absolute;
+  left: 50%;
+  bottom: 14px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  z-index: 3;
+}
+.sv-turn {
+  appearance: none;
+  cursor: pointer;
+  font-size: 1.2rem;
+  line-height: 1;
+  color: #fff;
+  background: rgba(8, 20, 14, 0.82);
+  border: 1px solid rgba(255,255,255,0.22);
+  border-radius: 50%;
+  width: 44px;
+  height: 44px;
+}
+.sv-ask { white-space: nowrap; box-shadow: 0 6px 18px rgba(0,0,0,0.35); }
+.sv-turn:focus-visible,
+.sv-ask:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+
+.sv-guide {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  top: 12px;
+  max-height: 55%;
+  overflow-y: auto;
+  padding: 13px 15px;
+  background: rgba(8, 20, 14, 0.90);
+  color: #fff;
+  border: 1px solid rgba(255,255,255,0.18);
+  border-inline-start: 5px solid var(--accent);
+  border-radius: var(--radius-sm);
+  z-index: 4;
+  font-size: 0.95rem;
+}
+.sv-guide p { margin: 0 0 6px; }
+.sv-guide p:last-child { margin-bottom: 0; }
+/* A written fallback and a live look at the image are different claims, so
+   they never look the same. */
+.sv-guide[data-kind="fallback"] { border-inline-start-color: #c68a00; }
+.sv-guide[data-kind="empty"] { border-inline-start-color: var(--muted); }
+.sv-guide-src {
+  font-size: 0.78rem;
+  color: rgba(255,255,255,0.68);
+  font-style: italic;
+}
+.sv-guide-loading { color: rgba(255,255,255,0.8); }
+
+@media (max-width: 520px) {
+  .sv-ask { font-size: 0.88rem; padding: 10px 12px; }
+  .sv-turn { width: 40px; height: 40px; }
+}
