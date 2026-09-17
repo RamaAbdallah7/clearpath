@@ -342,9 +342,44 @@ function parseAssistReply(raw) {
   return { answer: cleaned, confident: false };
 }
 
+/* Gemini, server-side. Same contract as the OpenRouter path so the browser
+   cannot tell which answered — and either way the key stays in this process
+   rather than in the page. */
+async function geminiAssist({ image, question, mode, lang, simple }) {
+  const key = process.env.GEMINI_API_KEY;
+  const model = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+  const m = /^data:([^;]+);base64,(.*)$/.exec(image || '');
+  if (!m) throw new Error('bad image');
+
+  const body = {
+    systemInstruction: { parts: [{ text: ASSIST_SYSTEM[mode] || ASSIST_SYSTEM.ask }] },
+    contents: [{ role: 'user', parts: [
+      { text: assistUserPrompt(mode, question, lang, simple) },
+      { inline_data: { mime_type: m[1], data: m[2] } }
+    ] }],
+    generationConfig: { temperature: 0.2, maxOutputTokens: 700, responseMimeType: 'application/json' }
+  };
+
+  const upstream = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(key)}`,
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+
+  const data = await upstream.json().catch(() => null);
+  if (!upstream.ok) {
+    // Log server-side only: upstream errors can echo key material.
+    console.error(`[proxy] gemini ${upstream.status}:`, data?.error?.message || '(no message)');
+    const e = new Error('gemini upstream'); e.status = upstream.status; throw e;
+  }
+  const text = (data?.candidates?.[0]?.content?.parts || []).map(p => p.text || '').join('');
+  return parseAssistReply(text);
+}
+
 async function handleAssist(req, res) {
   const orKey = process.env.OPENROUTER_API_KEY;
-  if (!orKey) return sendJSON(res, 503, { error: 'OPENROUTER_API_KEY is not set.' });
+  const gKey = process.env.GEMINI_API_KEY;
+  if (!orKey && !gKey) {
+    return sendJSON(res, 503, { error: 'Set GEMINI_API_KEY or OPENROUTER_API_KEY.' });
+  }
 
   let payload;
   try {
@@ -361,6 +396,18 @@ async function handleAssist(req, res) {
   if (image.length > ASSIST_MAX_IMAGE_CHARS) {
     return sendJSON(res, 413, { error: 'Image too large.' });
   }
+
+  // Gemini first when configured — it is the key the project now documents.
+  if (gKey) {
+    try {
+      const parsed = await geminiAssist({ image, question, mode, lang, simple });
+      if (parsed) return sendJSON(res, 200, parsed);
+    } catch (e) {
+      if (!orKey) return sendJSON(res, e.status || 502, { error: 'Assist upstream failed.' });
+      // else fall through to OpenRouter
+    }
+  }
+  if (!orKey) return sendJSON(res, 502, { error: 'Assist upstream failed.' });
 
   try {
     const upstream = await fetch('https://openrouter.ai/api/v1/chat/completions', {
@@ -658,6 +705,7 @@ server.listen(PORT, bindHost, () => {
   }
   console.log(`  AI cues:            ${process.env.OPENROUTER_API_KEY ? 'enabled' : 'off (no OPENROUTER_API_KEY — written cues will be used)'}`);
   console.log(`  Wheelchair routing: ${process.env.ORS_API_KEY ? 'enabled' : 'off (no ORS_API_KEY — keyless Valhalla will be used)'}`);
-  console.log(`  Assist (ask/read/explain): ${process.env.OPENROUTER_API_KEY ? 'enabled' : 'off (needs OPENROUTER_API_KEY)'}`);
+  const assistKey = process.env.GEMINI_API_KEY ? 'Gemini' : (process.env.OPENROUTER_API_KEY ? 'OpenRouter' : null);
+  console.log(`  Assist (ask/read/explain): ${assistKey ? 'enabled via ' + assistKey : 'off (set GEMINI_API_KEY)'}`);
   console.log(`  Volunteer hub:      ready  →  ${scheme}://localhost:${PORT}/volunteer.html\n`);
 });

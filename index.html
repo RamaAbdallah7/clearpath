@@ -196,6 +196,47 @@
         <button class="switch" id="hapticsToggle" type="button" role="switch" aria-checked="true"><span></span></button>
       </div>
 
+      <!-- Read-aloud preferences. First in Settings because for a blind
+           visitor these are the most important controls in the app. -->
+      <div class="settings-row">
+        <div>
+          <strong data-i18n="a11y.autoread"></strong>
+          <p data-i18n="a11y.autoread.help"></p>
+          <p class="key-status" data-i18n="a11y.keys"></p>
+        </div>
+        <button class="switch" id="autoReadToggle" type="button" role="switch" aria-checked="false"><span></span></button>
+      </div>
+
+      <div class="settings-row">
+        <div style="flex:1;">
+          <strong data-i18n="a11y.speed"></strong>
+          <div class="row" style="margin-top:10px; align-items:center;">
+            <button class="btn secondary small" id="readSlower" type="button" data-i18n="a11y.slower"></button>
+            <input type="range" id="readRate" min="0.5" max="1.6" step="0.05" value="0.98"
+                   style="flex:1; min-width:120px;" data-i18n-aria="a11y.speed">
+            <button class="btn secondary small" id="readFaster" type="button" data-i18n="a11y.faster"></button>
+            <span id="readRateVal" class="vision-threshold-val" aria-hidden="true"></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Bring-your-own-key. Lives in Settings rather than mid-flow, and
+           states the tradeoff plainly instead of hiding it. -->
+      <div class="settings-row key-row">
+        <div style="flex:1; min-width:0;">
+          <strong data-i18n="gemini.h"></strong>
+          <p data-i18n="gemini.body"></p>
+          <div class="row" style="margin-top:10px;">
+            <input type="password" id="geminiKey" autocomplete="off" spellcheck="false"
+                   data-i18n-placeholder="gemini.placeholder" aria-describedby="geminiStatus">
+            <button class="btn primary small" id="geminiSave" type="button" data-i18n="gemini.save"></button>
+            <button class="btn secondary small" id="geminiClear" type="button" data-i18n="gemini.clear"></button>
+          </div>
+          <p class="key-status" id="geminiStatus" role="status" aria-live="polite"></p>
+          <p><a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener" data-i18n="gemini.get"></a></p>
+        </div>
+      </div>
+
       <div class="settings-row">
         <div>
           <strong>Personalised cues</strong>
@@ -549,6 +590,7 @@
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="js/apibase.js"></script>
+<script src="js/gemini.js"></script>
 <script src="js/i18n.js"></script>
 <script src="js/toast.js"></script>
 <script src="js/sensory.js"></script>

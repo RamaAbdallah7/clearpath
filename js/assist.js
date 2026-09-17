@@ -240,14 +240,29 @@
     showAnswer(`<p>${t(forMode === "explain" ? "assist.explain.working" : "assist.answering")}</p>`, "loading");
 
     try {
-      const res = await fetch(ClearPathAPI.url("/api/assist"), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ image, question, mode: forMode, lang: I18n.lang(), simple })
-      });
-      if (res.status === 503) { offline(); return; }
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data.answer) { offline(); return; }
+      let data = null;
+
+      // Preferred path: the local proxy, where the key never reaches the
+      // browser at all.
+      if (ClearPathAPI.available) {
+        const res = await fetch(ClearPathAPI.url("/api/assist"), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ image, question, mode: forMode, lang: I18n.lang(), simple })
+        });
+        const body = await res.json().catch(() => ({}));
+        if (res.ok && body.answer) data = body;
+      }
+
+      // Fallback: the visitor's own Gemini key, held in their browser. This
+      // is what makes the published static site actually answer.
+      if (!data && window.ClearPathGemini && ClearPathGemini.hasKey) {
+        const g = await ClearPathGemini.assist({ image, question, mode: forMode, lang: I18n.lang(), simple });
+        if (g.ok) data = { answer: g.answer, confident: g.confident };
+        else if (g.reason === "bad-key") { badKey(); return; }
+      }
+
+      if (!data || !data.answer) { offline(); return; }
 
       // The hand-off. When the model says it isn't sure, we don't dress the
       // answer up — we say so and offer a person, which is exactly what the
@@ -263,6 +278,12 @@
     } finally {
       busy = false;
     }
+  }
+
+  function badKey() {
+    showAnswer(`<p>${t("gemini.badkey")}</p>`, "error");
+    speak(t("gemini.badkey"));
+    busy = false;
   }
 
   function offline() {
@@ -289,13 +310,24 @@
     const url = /^https?:\/\//i.test(raw.trim()) ? raw.trim() : "https://" + raw.trim();
     showAnswer(`<p>${t("assist.explain.working")}</p>`, "loading");
     try {
-      const res = await fetch(ClearPathAPI.url("/api/explain"), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url, lang: I18n.lang(), simple })
-      });
-      if (res.status === 503) { offline(); return; }
-      const d = await res.json().catch(() => ({}));
+      let d = null;
+      if (ClearPathAPI.available) {
+        const res = await fetch(ClearPathAPI.url("/api/explain"), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url, lang: I18n.lang(), simple })
+        });
+        const body = await res.json().catch(() => ({}));
+        if (body && body.ok) d = body;
+      }
+      // Browsers cannot fetch an arbitrary page (CORS), so the Gemini path
+      // reads the ADDRESS only and the answer says so.
+      if (!d && window.ClearPathGemini && ClearPathGemini.hasKey) {
+        const g = await ClearPathGemini.explainUrl({ url, lang: I18n.lang(), simple });
+        if (g.ok) d = g;
+        else if (g.reason === "bad-key") { badKey(); return; }
+      }
+      if (!d) d = { ok: false, code: "failed" };
       if (!d.ok) {
         showAnswer(`<p>${t(d.code === "notlink" ? "assist.explain.notlink" : "assist.explain.failed")}</p>`, "error");
         speak(t(d.code === "notlink" ? "assist.explain.notlink" : "assist.explain.failed"));
@@ -307,7 +339,8 @@
          <div class="explain-block"><h4>${t("assist.explain.what")}</h4><p>${escapeHtml(d.what || "")}</p></div>
          ${d.asks ? `<div class="explain-block"><h4>${t("assist.explain.asks")}</h4><p>${escapeHtml(d.asks)}</p></div>` : ""}
          ${steps ? `<div class="explain-block"><h4>${t("assist.explain.steps")}</h4><ol>${steps}</ol></div>` : ""}
-         ${d.watch ? `<div class="explain-block warn"><h4>${t("assist.explain.watch")}</h4><p>${escapeHtml(d.watch)}</p></div>` : ""}`,
+         ${d.watch ? `<div class="explain-block warn"><h4>${t("assist.explain.watch")}</h4><p>${escapeHtml(d.watch)}</p></div>` : ""}
+         ${d.addressOnly ? `<p class="assist-caveat">${t("assist.explain.addressOnly")}</p>` : ""}`,
         "explain");
       speak([d.what, d.asks, ...(d.steps || []), d.watch].filter(Boolean).join(". "), "calm");
     } catch (_) {
@@ -570,6 +603,20 @@
 
   let backendOff = false;
 
+  // Static host + own key: AI works, volunteers do not.
+  function showVolunteerOnlyNote() {
+    const card = document.querySelector("#screen-assist .card");
+    if (card.querySelector(".backend-note")) return;
+    const note = document.createElement("div");
+    note.className = "backend-note";
+    note.innerHTML = `<strong data-i18n="gemini.on.title"></strong><p data-i18n="gemini.on.body"></p>`;
+    card.insertBefore(note, card.querySelector(".assist-modes"));
+    el.assistWho.querySelector('[data-who="volunteer"]').disabled = true;
+    answerWho = "ai";
+    syncWho();
+    I18n.apply(card);
+  }
+
   function refreshLanguage() {
     I18n.apply(document.getElementById("screen-assist"));
     I18n.apply(document.getElementById("tabbar"));
@@ -610,6 +657,9 @@
     // front, instead of letting each button fail separately when tapped.
     window.addEventListener("clearpath:backend", (e) => {
       if (e.detail.available) return;
+      // A visitor who has supplied their own key does have AI answers, so
+      // telling them otherwise would be wrong. Only volunteers need a server.
+      if (window.ClearPathGemini && ClearPathGemini.hasKey) { showVolunteerOnlyNote(); return; }
       const note = document.createElement("div");
       note.className = "backend-note";
       // Marked up with keys rather than baked strings, so switching language

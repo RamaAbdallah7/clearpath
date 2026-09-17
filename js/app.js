@@ -156,6 +156,73 @@ document.addEventListener("DOMContentLoaded", () => {
     toast(on ? "Haptic pulses on" : "Haptic pulses off");
   });
 
+  /* ── Read-aloud preferences ── */
+  const autoReadBtn = document.getElementById("autoReadToggle");
+  const rateInput = document.getElementById("readRate");
+  const rateVal = document.getElementById("readRateVal");
+
+  function showRate() { rateVal.textContent = Number(ClearPathReader.rate).toFixed(2) + "×"; }
+
+  setSwitch(autoReadBtn, ClearPathReader.autoRead);
+  rateInput.value = ClearPathReader.rate;
+  showRate();
+
+  autoReadBtn.addEventListener("click", (e) => {
+    const on = e.currentTarget.getAttribute("aria-checked") !== "true";
+    setSwitch(e.currentTarget, on);
+    ClearPathReader.setAutoRead(on);
+    // Confirm by doing the thing, so the effect is audible immediately.
+    if (on) ClearPathReader.start(0);
+    else { ClearPathReader.stop(); toast(I18n.t("a11y.autoread")); }
+  });
+  rateInput.addEventListener("input", (e) => { ClearPathReader.setRate(e.target.value); showRate(); });
+  document.getElementById("readSlower").addEventListener("click", () => {
+    rateInput.value = Math.max(0.5, Number(rateInput.value) - 0.1);
+    ClearPathReader.setRate(rateInput.value); showRate();
+  });
+  document.getElementById("readFaster").addEventListener("click", () => {
+    rateInput.value = Math.min(1.6, Number(rateInput.value) + 0.1);
+    ClearPathReader.setRate(rateInput.value); showRate();
+  });
+
+  /* ── Gemini key ──
+     Saved to this browser only. The status line reports what actually
+     happened when the key was tested, rather than assuming it works. */
+  const gKeyInput = document.getElementById("geminiKey");
+  const gStatus = document.getElementById("geminiStatus");
+
+  function renderKeyStatus(text, state) {
+    gStatus.textContent = text;
+    gStatus.dataset.state = state || "";
+  }
+
+  async function testGeminiKey() {
+    renderKeyStatus(I18n.t("gemini.testing"), "checking");
+    const r = await ClearPathGemini.test();
+    if (r.ok) {
+      renderKeyStatus(I18n.t("gemini.ok") + ` (${r.model})`, "ok");
+      // AI answers just became possible; let the assist screen re-evaluate.
+      window.dispatchEvent(new CustomEvent("clearpath:backend", { detail: { available: false } }));
+    } else if (r.reason === "bad-key") renderKeyStatus(I18n.t("gemini.badkey"), "bad");
+    else if (r.reason === "network") renderKeyStatus(I18n.t("gemini.network"), "bad");
+    else renderKeyStatus(I18n.t("gemini.badkey"), "bad");
+  }
+
+  document.getElementById("geminiSave").addEventListener("click", async () => {
+    const v = gKeyInput.value.trim();
+    if (!v) return;
+    ClearPathGemini.setKey(v);
+    gKeyInput.value = "";
+    await testGeminiKey();
+  });
+  document.getElementById("geminiClear").addEventListener("click", () => {
+    ClearPathGemini.setKey("");
+    renderKeyStatus(I18n.t("gemini.none"), "");
+    toast(I18n.t("gemini.none"));
+  });
+  renderKeyStatus(ClearPathGemini.hasKey ? I18n.t("gemini.ok") : I18n.t("gemini.none"),
+                  ClearPathGemini.hasKey ? "ok" : "");
+
   // Personalised cues. The status line tells the truth about whether the
   // proxy is actually reachable, so nobody demos this believing it is on
   // when it has been silently falling back to the written text all along.

@@ -33,7 +33,16 @@
   let playing = false;
   let paused = false;
   let autoRead = false;
+  let rate = 0.98;
   let bar = null;
+
+  const RATE_KEY = "clearpath_read_rate";
+  const AUTO_KEY = "clearpath_auto_read";
+  try {
+    const r = parseFloat(localStorage.getItem(RATE_KEY));
+    if (!isNaN(r)) rate = Math.min(1.6, Math.max(0.5, r));
+    autoRead = localStorage.getItem(AUTO_KEY) === "1";
+  } catch (_) {}
 
   /* ── What counts as readable ────────────────────────────────────── */
   const READ_SELECTOR = [
@@ -136,7 +145,7 @@
     u.lang = I18n.speechLang();
     const v = (typeof pickVoice === "function") ? pickVoice(u.lang) : null;
     if (v) u.voice = v;
-    u.rate = 0.98;
+    u.rate = rate;
     u.onend = () => { if (playing && !paused) speakItem(index + 1); };
     // A failed utterance must not silently end the whole reading.
     u.onerror = () => { if (playing && !paused) setTimeout(() => speakItem(index + 1), 120); };
@@ -257,12 +266,26 @@
     }
 
     window.addEventListener("clearpath:language", () => { stop(); updateBar(); });
+
+    // Someone who cannot see the screen should not have to find a button
+    // before anything is spoken, so honour the saved preference on load too.
+    if (autoRead) setTimeout(() => start(0), 700);
   });
 
   window.ClearPathReader = {
     start, stop, next, prev, togglePause,
     get isPlaying() { return playing; },
-    setAutoRead(v) { autoRead = !!v; },
+    setAutoRead(v) {
+      autoRead = !!v;
+      try { localStorage.setItem(AUTO_KEY, autoRead ? "1" : "0"); } catch (_) {}
+    },
+    setRate(v) {
+      rate = Math.min(1.6, Math.max(0.5, Number(v) || 1));
+      try { localStorage.setItem(RATE_KEY, String(rate)); } catch (_) {}
+      // Apply immediately rather than only on the next line.
+      if (playing) { window.speechSynthesis.cancel(); speakItem(index); }
+    },
+    get rate() { return rate; },
     get autoRead() { return autoRead; }
   };
 })();

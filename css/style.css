@@ -869,3 +869,15 @@ input[type="range"] { width: 100%; height: var(--tap); accent-color: var(--accen
   .sr-main span { display: none; }   /* icon-only on small screens, aria-label carries the name */
   .sr-bar { bottom: calc(80px + env(safe-area-inset-bottom)); }
 }
+
+/* ── Key entry / status ───────────────────────────────────────────── */
+.key-row input[type="password"] { flex: 1 1 200px; min-width: 0; }
+.key-status {
+  margin: var(--s2) 0 0; font-size: var(--step-sm); color: var(--muted);
+}
+.key-status[data-state="ok"]  { color: var(--success); font-weight: 600; }
+.key-status[data-state="bad"] { color: var(--danger); font-weight: 600; }
+.assist-caveat {
+  margin-top: var(--s3); font-size: var(--step-sm);
+  color: var(--caution); font-style: italic;
+}
